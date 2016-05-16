@@ -1,22 +1,25 @@
 package models.tracing.volume
 
-import com.scalableminds.util.geometry.{Vector3D, Point3D, BoundingBox}
-import models.annotation.{AnnotationLike, AnnotationContentService, AnnotationContent, AnnotationSettings}
+import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
+import models.annotation.{AnnotationContent, AnnotationContentService, AnnotationLike, AnnotationSettings}
 import models.basics.SecuredBaseDAO
 import models.binary._
-import java.io.{PipedOutputStream, PipedInputStream, InputStream}
-import models.tracing.{CommonTracingService, CommonTracing}
+import java.io.{InputStream, PipedInputStream, PipedOutputStream}
+
+import models.tracing.{CommonTracing, CommonTracingService}
 import net.liftweb.common.{Failure, Full}
 import play.api.Logger
 import play.api.libs.iteratee.{Enumerator, Iteratee}
-import play.api.libs.json.{Json, JsValue}
+import play.api.libs.json.{JsArray, JsValue, Json}
 import com.scalableminds.util.reactivemongo.{DBAccessContext, GlobalAccessContext}
-import com.scalableminds.util.tools.{FoxImplicits, Fox}
+import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import play.api.libs.ws.WS
 import reactivemongo.bson.BSONObjectID
 import reactivemongo.play.json.BSONFormats._
 import play.api.libs.concurrent.Execution.Implicits._
-import com.scalableminds.braingames.binary.models.{DataLayer, UserDataLayer, DataSource}
+import com.scalableminds.braingames.binary.models.{DataLayer, DataSource, UserDataLayer}
+import models.user.time.TimeSpanService
+import play.api.i18n.Messages
 
 /**
  * Company: scalableminds
@@ -42,22 +45,6 @@ case class VolumeTracing(
   type Self = VolumeTracing
 
   def service = VolumeTracingService
-
-  def updateFromJson(jsUpdates: Seq[JsValue])(implicit ctx: DBAccessContext): Fox[VolumeTracing] = {
-    val updates = jsUpdates.flatMap { json =>
-      TracingUpdater.createUpdateFromJson(json)
-    }
-    if (jsUpdates.size == updates.size) {
-      for {
-        updatedTracing <- updates.foldLeft(Fox.successful(this)) {
-          case (f, updater) => f.flatMap(tracing => updater.update(tracing))
-        }
-        _ <- VolumeTracingDAO.update(updatedTracing._id, updatedTracing.copy(timestamp = System.currentTimeMillis))(GlobalAccessContext)
-      } yield updatedTracing
-    } else {
-      Fox.empty
-    }
-  }
 
   def temporaryDuplicate(id: String)(implicit ctx: DBAccessContext) = {
     // TODO: implement
@@ -120,6 +107,24 @@ object VolumeTracingService extends AnnotationContentService with CommonTracingS
   type AType = VolumeTracing
 
   def dao = VolumeTracingDAO
+
+  def updateFromJson(id: String, json: JsValue)(implicit ctx: DBAccessContext): Fox[VolumeTracing] = {
+    json match {
+      case JsArray(jsUpdates) =>
+        val updates = jsUpdates.flatMap { json =>
+          TracingUpdater.createUpdateFromJson(json)
+        }
+        for {
+          tracing <- findOneById(id)
+          updatedTracing <- updates.foldLeft(Fox.successful(tracing)) {
+            case (f, updater) => f.flatMap(tracing => updater.update(tracing))
+          }
+          _ <- VolumeTracingDAO.update(updatedTracing._id, updatedTracing.copy(timestamp = System.currentTimeMillis))(GlobalAccessContext)
+        } yield updatedTracing
+      case t                  =>
+        Failure("format.json.invalid")
+    }
+  }
 
   def findOneById(id: String)(implicit ctx: DBAccessContext) =
     VolumeTracingDAO.findOneById(id)

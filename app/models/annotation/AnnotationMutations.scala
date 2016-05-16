@@ -32,7 +32,7 @@ trait AnnotationMutationsLike {
 
   def reopen()(implicit ctx: DBAccessContext): Fox[AType]
 
-  def updateFromJson(js: Seq[JsValue])(implicit ctx: DBAccessContext): Fox[AType]
+  def updateFromJson(js: JsValue)(implicit ctx: DBAccessContext): Fox[AType]
 
   def cancelTask()(implicit ctx: DBAccessContext): Fox[AType]
 
@@ -126,8 +126,8 @@ class AnnotationMutations(val annotation: Annotation)
     } yield updatedAnnotation
   }
 
-  def updateFromJson(js: Seq[JsValue])(implicit ctx: DBAccessContext) = {
-    annotation.content.flatMap(_.updateFromJson(js)).flatMap(_ =>
+  def updateFromJson(js: JsValue)(implicit ctx: DBAccessContext) = {
+    annotation.content.flatMap(el => el.service.updateFromJson(el.id, js)).flatMap(_ =>
       AnnotationDAO.incrementVersion(annotation._id))
   }
 

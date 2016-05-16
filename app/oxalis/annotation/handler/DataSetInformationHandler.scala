@@ -7,9 +7,10 @@ import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import models.annotation.{AnnotationRestrictions, AnnotationType, TemporaryAnnotation}
 import models.binary.DataSetDAO
 import models.tracing.skeleton.SkeletonTracing
-import models.tracing.skeleton.temporary.TemporarySkeletonTracing
+import models.annotation.{AnnotationRestrictions, AnnotationType, TemporaryAnnotation}
 import models.user.User
 import play.api.libs.concurrent.Execution.Implicits._
+import reactivemongo.bson.BSONObjectID
 
 /**
   * Company: scalableminds
@@ -33,18 +34,18 @@ object DataSetInformationHandler extends AnnotationInformationHandler with FoxIm
       dataSet <- DataSetDAO.findOneBySourceName(dataSetName) ?~> "dataSet.notFound"
       team <- user.flatMap(_.teamNames.intersect(dataSet.allowedTeams).headOption) ?~> "notAllowed"
     } yield {
-      val content = TemporarySkeletonTracing(
+      val content = SkeletonTracing(
         dataSetName,
-        dataSetName,
-        Nil,
         Nil,
         System.currentTimeMillis(),
         Some(0),
         dataSet.defaultStart,
         dataSet.defaultRotation,
         SkeletonTracing.defaultZoomLevel,
-        None
-      )
+        None,
+        isArchived = false,
+        trees = List.empty,
+        id = dataSetName + "_" + BSONObjectID.generate.stringify)
 
       TemporaryAnnotation(
         dataSetName,

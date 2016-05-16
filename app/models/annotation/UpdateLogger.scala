@@ -6,7 +6,6 @@ package models.annotation
 import com.scalableminds.util.reactivemongo.DBAccessContext
 import com.scalableminds.util.tools.FoxImplicits
 import models.basics.SecuredBaseDAO
-import models.tracing.skeleton.DBTreeDAO._
 import play.api.libs.json.{JsValue, Json}
 import play.api.libs.concurrent.Execution.Implicits._
 import reactivemongo.api.indexes.{Index, IndexType}

@@ -29,8 +29,6 @@ trait AnnotationContent {
 
   def dataSetName: String
 
-  def updateFromJson(jsUpdates: Seq[JsValue])(implicit ctx: DBAccessContext): Fox[Self]
-
   def settings: AnnotationSettings
 
   def temporaryDuplicate(id: String)(implicit ctx: DBAccessContext): Fox[AnnotationContent]

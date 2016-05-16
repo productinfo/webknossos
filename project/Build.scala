@@ -26,6 +26,10 @@ object Dependencies{
   val akkaRemote = "com.typesafe.akka" %% "akka-remote" % akkaVersion
   val akkaLogging = "com.typesafe.akka" %% "akka-slf4j" % akkaVersion
   val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0"
+  val akkaPersistence = "com.typesafe.akka" %% "akka-persistence" % akkaVersion
+  val akkaCluster = "com.typesafe.akka" %% "akka-cluster" % akkaVersion
+  val akkaClusterShard = "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion
+  val akkaPersistenceCassandra = "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.14"
   val jerseyClient = "com.sun.jersey" % "jersey-client" % "1.8"
   val jerseyCore = "com.sun.jersey" % "jersey-core" % "1.8"
   val reactivePlay = "org.reactivemongo" %% "play2-reactivemongo" % reactivePlayVersion
@@ -37,6 +41,9 @@ object Dependencies{
   val airbrake = "com.scalableminds" %% "play-airbrake" % "0.5.0"
   val mongev = "com.scalableminds" %% "play-mongev" % "0.4.1"
   val urlHelper = "com.netaporter" %% "scala-uri" % "0.4.14"
+  val leveldb = "org.iq80.leveldb" % "leveldb" % "0.7"
+  val leveldbjni = "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
+  val typesafeLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0"
   val tiff = Seq(
       "com.twelvemonkeys.common" % "common-lang" % twelvemonkeysVersion,
       "com.twelvemonkeys.common" % "common-io" % twelvemonkeysVersion,
@@ -151,6 +158,12 @@ object ApplicationBuild extends Build {
     akkaAgent,
     akkaRemote,
     akkaLogging,
+    akkaPersistence,
+    akkaCluster,
+    akkaClusterShard,
+    leveldb,
+    leveldbjni,
+    akkaPersistenceCassandra,
     jerseyClient,
     jerseyCore,
     reactiveBson,
@@ -159,6 +172,7 @@ object ApplicationBuild extends Build {
     braingamesBinary,
     braingamesDatastore,
     scalaAsync,
+    typesafeLogging,
     cache,
     ws,
     scalaLogging,

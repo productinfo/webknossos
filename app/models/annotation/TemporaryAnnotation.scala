@@ -78,7 +78,7 @@ class TemporaryAnnotationMutations(annotation: TemporaryAnnotation) extends Anno
 
   def reopen()(implicit ctx: DBAccessContext): Fox[TemporaryAnnotationMutations#AType] = ???
 
-  def updateFromJson(js: Seq[JsValue])(implicit ctx: DBAccessContext): Fox[TemporaryAnnotationMutations#AType] = ???
+  def updateFromJson(js: JsValue)(implicit ctx: DBAccessContext): Fox[TemporaryAnnotationMutations#AType] = ???
 
   def cancelTask()(implicit ctx: DBAccessContext): Fox[TemporaryAnnotationMutations#AType] = ???
 

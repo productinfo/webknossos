@@ -1,6 +1,6 @@
 package models.annotation
 
-import java.io.{FileOutputStream, BufferedOutputStream}
+import java.io.{BufferedOutputStream, FileOutputStream}
 
 import com.scalableminds.util.io.ZipIO
 import models.user.User
@@ -12,18 +12,20 @@ import play.api.libs.Files.TemporaryFile
 import play.api.libs.json.Json
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
-import com.scalableminds.util.tools.{TextUtils, FoxImplicits, Fox}
-import models.tracing.skeleton.SkeletonTracingService
+
+import com.scalableminds.util.tools.{Fox, FoxImplicits, TextUtils}
 import play.api.libs.concurrent.Execution.Implicits._
 import models.task.{Task, TaskService}
-import com.scalableminds.util.geometry.{Vector3D, Point3D, BoundingBox}
+import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
 import reactivemongo.bson.BSONObjectID
 import models.annotation.AnnotationType._
 import scala.Some
+
 import models.binary.{DataSet, DataSetDAO}
 import oxalis.nml.NML
 import com.scalableminds.util.mvc.BoxImplicits
 import reactivemongo.play.json.BSONFormats._
+import models.tracing.skeleton.persistence.{SkeletonTracingInit, SkeletonTracingService}
 import play.api.i18n.{Messages, MessagesApi}
 
 /**
@@ -136,7 +138,7 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     rotation: Vector3D)(implicit ctx: DBAccessContext) = {
 
     for {
-      tracing <- SkeletonTracingService.createFrom(dataSetName, start, rotation, boundingBox, insertStartAsNode = true, isFirstBranchPoint = true, settings) ?~> "Failed to create skeleton tracing."
+      tracing <- SkeletonTracingService.createFrom(SkeletonTracingInit(dataSetName, start, rotation, boundingBox, insertStartAsNode = true, isFirstBranchPoint = true, settings)) ?~> "Failed to create skeleton tracing."
       content = ContentReference.createFor(tracing)
       _ <- AnnotationDAO.insert(Annotation(Some(userId), content, team = task.team, typ = AnnotationType.TracingBase, _task = Some(task._id))) ?~> "Failed to insert annotation."
     } yield tracing

@@ -1,5 +1,6 @@
 import akka.actor.{PoisonPill, Props}
 import akka.routing.RoundRobinPool
+import akka.actor.{ActorSystem, Props}
 import com.scalableminds.util.reactivemongo.GlobalDBAccess
 import com.scalableminds.util.security.SCrypt
 import models.binary.{DataStore, DataStoreDAO, WebKnossosStore}
@@ -13,12 +14,14 @@ import models.task._
 import oxalis.annotation.AnnotationStore
 import com.scalableminds.util.mail.Mailer
 import play.api.libs.concurrent.Execution.Implicits._
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
+import models.tracing.skeleton.persistence.SkeletonTracingService
 import play.airbrake.Airbrake
 import play.api.libs.json.Json
 import play.api.mvc._
 
 object Global extends GlobalSettings {
+  var clusters: List[ActorSystem] = Nil
 
   override def onStart(app: Application) {
     val conf = app.configuration
@@ -47,11 +50,27 @@ object Global extends GlobalSettings {
         name = "availableTasksMailActor"
       )
     }
+
+    clusters = List("2561") map { port =>
+      // Override the configuration of the port
+      val clusterConfig = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port).
+                   withFallback(conf)
+
+      // Create an Akka system
+      val sys = ActorSystem("application", clusterConfig)
+      // Create an actor that handles cluster domain events
+      SkeletonTracingService.start(sys)
+      sys
+    }
   }
 
   override def onError(request: RequestHeader, ex: Throwable) = {
     Airbrake.notify(request, ex)
     super.onError(request, ex)
+  }
+
+  override def onStop(app: Application): Unit = {
+    clusters.foreach(_.terminate())
   }
 }
 

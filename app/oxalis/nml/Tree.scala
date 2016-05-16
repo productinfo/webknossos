@@ -1,19 +1,34 @@
 package oxalis.nml
 
+import com.scalableminds.util.geometry.{Point3D, Vector3D}
 import com.scalableminds.util.image.Color
-import com.scalableminds.util.geometry.{Vector3D, Point3D}
+import play.api.libs.json.Json
 
 case class Tree(treeId: Int, nodes: Set[Node], edges: Set[Edge], color: Option[Color], name: String = "") extends TreeLike {
 
   def addNodes(ns: Set[Node]) = this.copy(nodes = nodes ++ ns)
 
+  def removeNode(nid: Int) = this.copy(nodes = nodes.filter(_.id != nid))
+
+  def updateNode(node: Node) = this.copy(nodes = nodes.filter(_.id != node.id) + node)
+
   def addEdges(es: Set[Edge]) = this.copy(edges = edges ++ es)
+
+  def removeEdge(edge: Edge) = this.copy(edges = edges - edge - edge.inverted)
 
   def timestamp =
     if (nodes.isEmpty)
       System.currentTimeMillis()
     else
       nodes.minBy(_.timestamp).timestamp
+
+  def containsNode(nid: Int) =
+    nodes.exists(_.id == nid)
+
+  def containsEdge(s: Edge) =
+    edges.exists(e =>
+      e.source == s.source && e.target == s.target ||
+        e.source == s.target && e.target == s.source)
 
   def --(t: Tree) = {
     this.copy(nodes = nodes -- t.nodes, edges = edges -- t.edges)
@@ -43,6 +58,8 @@ case class Tree(treeId: Int, nodes: Set[Node], edges: Set[Edge], color: Option[C
 }
 
 object Tree {
+  implicit val treeFormat = Json.format[Tree]
+
   def empty = Tree(1, Set.empty, Set.empty, None)
 
   def createFrom(node: Point3D, rotation: Vector3D) =

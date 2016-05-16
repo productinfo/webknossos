@@ -1,239 +1,174 @@
 package models.tracing.skeleton
 
-import com.scalableminds.util.geometry.Vector3D
-import play.api.libs.json._
+import scala.collection.generic
+
+import com.scalableminds.util.geometry.{Point3D, Vector3D}
 import com.scalableminds.util.image.Color
-import play.api.Logger
-import com.scalableminds.util.tools.{Fox, FoxImplicits}
-import scala.concurrent.Future
-import play.api.libs.concurrent.Execution.Implicits._
-import com.scalableminds.util.reactivemongo.DBAccessContext
+import models.tracing.skeleton.persistence.SkeletonTracingProtocol._
+import oxalis.nml._
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
-object TracingUpdater {
+object JsonTracingUpdateParser {
+  val valueReads = (__ \ "value").read[JsObject]
 
-  implicit object TracingUpdateReads extends Reads[TracingUpdater] {
-    def reads(js: JsValue) = {
-      val value = (js \ "value").as[JsObject]
-      JsSuccess((js \ "action").as[String] match {
-        case "createTree" => CreateTree(value)
-        case "deleteTree" => DeleteTree(value)
-        case "updateTree" => UpdateTree(value)
-        case "mergeTree" => MergeTree(value)
-        case "moveTreeComponent" => MoveTreeComponent(value)
-        case "createNode" => CreateNode(value)
-        case "deleteNode" => DeleteNode(value)
-        case "updateNode" => UpdateNode(value)
-        case "createEdge" => CreateEdge(value)
-        case "deleteEdge" => DeleteEdge(value)
-        case "updateTracing" => UpdateTracing(value)
-      })
+  val actionReads = (__ \ "action").read[String]
+
+  def parseUpdateArray(skeletonId: String): Reads[List[SkeletonCmd]] = {
+    __.read(Reads.traversableReads[List, SkeletonCmd](implicitly[generic.CanBuildFrom[List[_],SkeletonCmd,List[SkeletonCmd]]],parseUpdate(skeletonId)))
+  }
+
+  class FailedReads[A](msg: String) extends Reads[A] {
+    override def reads(json: JsValue): JsResult[A] = JsError(msg)
+  }
+
+  def parseUpdate(skeletonId: String): Reads[SkeletonCmd] = {
+    actionReads.flatMap { action =>
+      val valueReads = action match {
+        case "createTree"        => createTreeReads(skeletonId)
+        case "deleteTree"        => deleteTreeReads(skeletonId)
+        case "updateTree"        => updateTreeReads(skeletonId)
+        case "mergeTree"         => mergeTreeReads(skeletonId)
+        case "moveTreeComponent" => moveTreeComponentReads(skeletonId)
+        case "createNode"        => createNodeReads(skeletonId)
+        case "deleteNode"        => deleteNodeReads(skeletonId)
+        case "updateNode"        => updateNodeReads(skeletonId)
+        case "createEdge"        => createEdgeReads(skeletonId)
+        case "deleteEdge"        => deleteEdgeReads(skeletonId)
+        case "updateTracing"     => updateTracingReads(skeletonId)
+        case action              => new FailedReads[SkeletonCmd](s"Invalid action '$action'")
+      }
+      (__ \ "value").read(valueReads)
     }
   }
 
-  def createUpdateFromJson(js: JsValue)(implicit ctx: DBAccessContext): Option[TracingUpdate] = {
-    try {
-      val updater = js.as[TracingUpdater]
-      Some(updater.createUpdate())
-    } catch {
-      case e: java.lang.RuntimeException =>
-        Logger.error("Invalid json: " + e + "\n While trying to parse:\n" + Json.prettyPrint(js))
-        None
+  private def nameFromId(treeId: Int) = f"Tree$treeId%03d"
+
+  private def createTreeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val createTree =
+      ((__ \ "id").read[Int] and
+        (__ \ "color").readNullable[Color] and
+        (__ \ "timestamp").read[Long] and
+        (__ \ "name").readNullable[String]).tupled
+
+    createTree.map {
+      case ((id, color, timestamp, name)) =>
+        CreateTreeCmd(skeletonId, Tree(id, Set.empty, Set.empty, color, name = name.getOrElse(nameFromId(id))))
     }
   }
-}
 
-case class TracingUpdate(update: SkeletonTracing => Fox[SkeletonTracing])
+  private def deleteTreeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val idReads = (__ \ "id").read[Int]
 
-trait TracingUpdater extends FoxImplicits {
-  def createUpdate()(implicit ctx: DBAccessContext): TracingUpdate
-}
-
-case class CreateTree(value: JsObject) extends TracingUpdater {
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val id = (value \ "id").as[Int]
-    val color = (value \ "color").asOpt[Color]
-    val timestamp = (value \ "timestamp").as[Long]
-    val name = (value \ "name").asOpt[String].getOrElse(DBTree.nameFromId(id))
-    TracingUpdate { t =>
-      for {
-        updatedTracing <- t.updateStatistics(_.createTree) ?~> "Failed to update tracing statistics."
-        _ <- DBTreeDAO.insert(DBTree(t._id, id, color, timestamp, name)) ?~> "Failed to insert tree."
-      } yield updatedTracing
+    idReads.map {
+      case id =>
+        DeleteTreeCmd(skeletonId, id)
     }
   }
-}
 
-case class DeleteTree(value: JsObject) extends TracingUpdater {
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val id = (value \ "id").as[Int]
-    TracingUpdate { t =>
-      for {
-        tree <- t.tree(id).toFox ?~> "Failed to access tree."
-        updatedTracing <- t.updateStatistics(_.deleteTree(tree)) ?~> "Failed to update tracing statistics."
-        _ <- DBTreeService.remove(tree._id) ?~> "Failed to remove tree."
-      } yield updatedTracing
+  private def updateTreeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val updateTree =
+      ((__ \ "id").read[Int] and
+        (__ \ "updatedId").readNullable[Int] and
+        (__ \ "color").readNullable[Color] and
+        (__ \ "name").readNullable[String]).tupled
+
+    updateTree.map {
+      case ((id, updatedId, color, name)) =>
+        UpdateTreePropertiesCmd(skeletonId, id, updatedId, color, name = name.getOrElse(nameFromId(id)))
     }
   }
-}
 
-case class UpdateTree(value: JsObject) extends TracingUpdater {
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val id = (value \ "id").as[Int]
-    val updatedId = (value \ "updatedId").asOpt[Int].getOrElse(id)
-    val color = (value \ "color").asOpt[Color]
-    val name = (value \ "name").asOpt[String].getOrElse(DBTree.nameFromId(id))
-    TracingUpdate { t =>
-      for {
-        tree <- t.tree(id).toFox ?~> "Failed to access tree."
-        updated = tree.copy(color = color orElse tree.color, treeId = updatedId, name = name)
-        _ <- DBTreeDAO.update(tree._id, updated) ?~> "Failed to update tree."
-      } yield t
+  private def mergeTreeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val mergeTrees =
+      ((__ \ "sourceId").read[Int] and
+        (__ \ "targetId").read[Int]).tupled
+
+    mergeTrees.map {
+      case ((sourceId, targetId)) =>
+        MergeTreesCmd(skeletonId, sourceId, targetId)
     }
   }
-}
 
-case class MergeTree(value: JsObject) extends TracingUpdater {
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val sourceId = (value \ "sourceId").as[Int]
-    val targetId = (value \ "targetId").as[Int]
-    TracingUpdate { t =>
-      for {
-        source <- t.tree(sourceId).toFox ?~> "Failed to access source tree."
-        target <- t.tree(targetId).toFox ?~> "Failed to access target tree."
-        updatedTracing <- t.updateStatistics(_.mergeTree) ?~> "Failed to update tracing statistics."
-        _ <- DBNodeDAO.moveAllNodes(source._id, target._id) ?~> "Failed to move all nodes."
-        _ <- DBEdgeDAO.moveAllEdges(source._id, target._id) ?~> "Failed to move all edges."
-        _ <- DBTreeService.remove(source._id) ?~> "Failed to remove source tree."
-      } yield updatedTracing
+  private def moveTreeComponentReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val mergeTrees =
+      ((__ \ "sourceId").read[Int] and
+        (__ \ "targetId").read[Int] and
+        (__ \ "nodeIds").read[List[Int]]).tupled
+
+    mergeTrees.map {
+      case ((sourceId, targetId, nodeIds)) =>
+        MoveTreeComponentCmd(skeletonId, sourceId, targetId, nodeIds)
     }
   }
-}
 
-case class MoveTreeComponent(value: JsObject) extends TracingUpdater {
+  private def createNodeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val createNode =
+      ((__ \ "treeId").read[Int] and
+        (__).read[Node]).tupled
 
-  import oxalis.nml.Node
-
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val nodeIds = (value \ "nodeIds").as[List[Int]]
-    val sourceId = (value \ "sourceId").as[Int]
-    val targetId = (value \ "targetId").as[Int]
-    TracingUpdate { t =>
-      for {
-        source <- t.tree(sourceId).toFox ?~> "Failed to access source tree."
-        target <- t.tree(targetId).toFox ?~> "Failed to access target tree."
-        _ <- DBTreeService.moveTreeComponent(nodeIds, source._id, target._id) ?~> "Failed to move tree compontents."
-      } yield t
+    createNode.map {
+      case ((treeId, node)) =>
+        CreateNodeCmd(skeletonId, treeId, node)
     }
   }
-}
 
-case class CreateNode(value: JsObject) extends TracingUpdater {
+  private def deleteNodeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val deleteNode =
+      ((__ \ "id").read[Int] and
+        (__ \ "treeId").read[Int]).tupled
 
-  import oxalis.nml.Node
-
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val node = value.as[Node]
-    val treeId = (value \ "treeId").as[Int]
-    TracingUpdate { t =>
-      for {
-        tree <- t.tree(treeId).toFox ?~> "Failed to access tree."
-        updatedTracing <- t.updateStatistics(_.createNode) ?~> "Failed to update tracing statistics."
-        _ <- DBNodeDAO.insert(DBNode(node, tree._id)) ?~> "Failed to insert node into tree."
-      } yield updatedTracing
+    deleteNode.map {
+      case ((id, treeId)) =>
+        DeleteNodeCmd(skeletonId, id, treeId)
     }
   }
-}
 
-case class DeleteNode(value: JsObject) extends TracingUpdater {
+  private def updateNodeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val updateNode =
+      ((__ \ "treeId").read[Int] and
+        (__).read[Node]).tupled
 
-  import oxalis.nml.Node
-
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val nodeId = (value \ "id").as[Int]
-    val treeId = (value \ "treeId").as[Int]
-    TracingUpdate { t =>
-      for {
-        tree <- t.tree(treeId).toFox ?~> "Failed to access tree."
-        updatedTracing <- t.updateStatistics(_.deleteNode(nodeId, tree)) ?~> "Failed to update tracing statistics."
-        _ <- DBNodeDAO.remove(nodeId, tree._id) ?~> "Failed to remove node."
-        _ <- DBEdgeDAO.deleteEdgesOfNode(nodeId, tree._id) ?~> "Failed to remove edges of node."
-      } yield updatedTracing
+    updateNode.map {
+      case ((treeId, node)) =>
+        UpdateNodePropertiesCmd(skeletonId, treeId, node)
     }
   }
-}
 
-case class UpdateNode(value: JsObject) extends TracingUpdater {
+  private def createEdgeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val createEdge =
+      ((__ \ "treeId").read[Int] and
+        (__).read[Edge]).tupled
 
-  import oxalis.nml.Node
-
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val node = value.as[Node]
-    val treeId = (value \ "treeId").as[Int]
-    TracingUpdate { t =>
-      for {
-        tree <- t.tree(treeId).toFox ?~> "Failed to access tree."
-        _ <- DBNodeDAO.updateNode(node, tree._id) ?~> "Failed to update node."
-      } yield t
+    createEdge.map {
+      case ((treeId, edge)) =>
+        CreateEdgeCmd(skeletonId, treeId, edge)
     }
   }
-}
 
-case class CreateEdge(value: JsObject) extends TracingUpdater {
+  private def deleteEdgeReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val deleteEdge =
+      ((__ \ "treeId").read[Int] and
+        (__).read[Edge]).tupled
 
-  import oxalis.nml.Edge
-
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val edge = value.as[Edge]
-    val treeId = (value \ "treeId").as[Int]
-    TracingUpdate { t =>
-      for {
-        tree <- t.tree(treeId).toFox ?~> "Failed to access tree."
-        updatedTracing <- t.updateStatistics(_.createEdge) ?~> "Failed to update tracing statistics."
-        _ <- DBEdgeDAO.insert(DBEdge(edge, tree._id)) ?~> "Failed to insert edge."
-      } yield updatedTracing
+    deleteEdge.map {
+      case ((treeId, edge)) =>
+        DeleteEdgeCmd(skeletonId, treeId, edge)
     }
   }
-}
 
-case class DeleteEdge(value: JsObject) extends TracingUpdater {
+  private def updateTracingReads(skeletonId: String): Reads[SkeletonCmd] = {
+    val updateTracing =
+      ((__ \ "branchPoints").read[List[BranchPoint]] and
+        (__ \ "comments").read[List[Comment]] and
+        (__ \ "activeNode").readNullable[Int] and
+        (__ \ "editPosition").read[Point3D] and
+        (__ \ "editRotation").read[Vector3D] and
+        (__ \ "zoomLevel").read[Double]).tupled
 
-  import oxalis.nml.Edge
-
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val edge = value.as[Edge]
-    val treeId = (value \ "treeId").as[Int]
-    TracingUpdate { t =>
-      for {
-        tree <- t.tree(treeId).toFox ?~> "Failed to access tree."
-        updatedTracing <- t.updateStatistics(_.deleteEdge) ?~> "Failed to update tracing statistics."
-        _ <- DBEdgeDAO.remove(edge, tree._id) ?~> "Failed to remove edge."
-      } yield updatedTracing
-    }
-  }
-}
-
-case class UpdateTracing(value: JsObject) extends TracingUpdater {
-
-  import oxalis.nml.BranchPoint
-  import oxalis.nml.Comment
-  import com.scalableminds.util.geometry.Point3D
-
-  def createUpdate()(implicit ctx: DBAccessContext) = {
-    val branchPoints = (value \ "branchPoints").as[List[BranchPoint]]
-    val comments = (value \ "comments").as[List[Comment]]
-    val activeNodeId = (value \ "activeNode").asOpt[Int]
-    val editPosition = (value \ "editPosition").as[Point3D]
-    val editRotation = (value \ "editRotation").as[Vector3D]
-    val zoomLevel = (value \ "zoomLevel").as[Double]
-    TracingUpdate { t =>
-      val updated = t.copy(
-        branchPoints = branchPoints,
-        comments = comments,
-        activeNodeId = activeNodeId,
-        editPosition = editPosition,
-        editRotation = editRotation,
-        zoomLevel = zoomLevel)
-      SkeletonTracingService.update(t._id, updated).map(_ => updated) ?~> "Failed to update tracing."
+    updateTracing.map {
+      case ((branchPoints, comments, activeNode, editPosition, editRotation, zoomLevel)) =>
+        UpdateMetadataCmd(skeletonId, Some(branchPoints), Some(comments), activeNode, Some(editPosition), Some(editRotation), Some(zoomLevel))
     }
   }
 }

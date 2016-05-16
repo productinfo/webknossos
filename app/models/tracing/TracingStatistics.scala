@@ -24,7 +24,7 @@ trait AnnotationStatistics extends FoxImplicits { this: AnnotationLike =>
   def statisticsForAnnotation(): Fox[TracingStatistics] = {
     this.content.flatMap {
       case t: SkeletonTracing =>
-        t.getOrCollectStatistics
+        t.stats
       case _                  =>
         Logger.warn("No statistics available for content")
         Future.successful(VolumeTracingStatistics())

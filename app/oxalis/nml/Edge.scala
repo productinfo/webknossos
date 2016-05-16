@@ -3,7 +3,9 @@ package oxalis.nml
 import com.scalableminds.util.xml.{SynchronousXMLWrites, XMLWrites}
 import play.api.libs.json._
 
-case class Edge(source: Int, target: Int)
+case class Edge(source: Int, target: Int){
+  def inverted = Edge(target, source)
+}
 
 object Edge {
   implicit object EdgeXMLWrites extends SynchronousXMLWrites[Edge] {

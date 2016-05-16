@@ -23,7 +23,6 @@ import play.api.libs.functional.syntax._
 import play.twirl.api.Html
 import models.user.{UserService, User, UserDAO}
 import scala.concurrent.duration.Duration
-import models.tracing.skeleton.DBTreeDAO
 import models.binary.DataSetDAO
 
 class StatisticsController @Inject()(val messagesApi: MessagesApi)
@@ -56,7 +55,7 @@ class StatisticsController @Inject()(val messagesApi: MessagesApi)
           numberOfUsers <- UserService.countNonAnonymousUsers
           numberOfDatasets <- DataSetDAO.count(Json.obj())
           numberOfAnnotations <- AnnotationDAO.countAll
-          numberOfTrees <- DBTreeDAO.count(Json.obj())
+          numberOfTrees <- Fox.successful(-1) // TODO: Reimplement tree counter (send msg from actor to actor that counts the trees)
           numberOfAssignments <- OpenAssignmentService.countOpenAssignments
         } yield {
           Ok(Json.obj(

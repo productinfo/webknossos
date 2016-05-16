@@ -1,6 +1,5 @@
 package models.tracing.skeleton
 
-import models.tracing.skeleton.temporary.TemporarySkeletonTracing
 import oxalis.nml._
 import oxalis.nml.utils._
 import play.api.libs.iteratee.Enumerator
@@ -37,7 +36,7 @@ trait SkeletonTracingLike extends AnnotationContent {
 
   def dataSetName: String
 
-  def trees: Fox[List[TreeLike]]
+  def trees: List[Tree]
 
   def activeNodeId: Option[Int]
 
@@ -77,8 +76,7 @@ object SkeletonTracingLike extends FoxImplicits {
       for {
         dataSet <- DataSetDAO.findOneBySourceName(e.dataSetName)
         dataSource <- dataSet.dataSource.toFox
-        trees <- e.trees
-        treesXml <- Xml.toXML(trees.filterNot(_.nodes.isEmpty))
+        treesXml = Xml.toXML(e.trees.filterNot(_.nodes.isEmpty))
         branchpoints <- Xml.toXML(e.branchPoints)
         comments <- Xml.toXML(e.comments)
       } yield {
@@ -103,15 +101,11 @@ object SkeletonTracingLike extends FoxImplicits {
   }
 
   def skeletonTracingLikeWrites(t: SkeletonTracingLike) =
-    for {
-      trees <- t.trees
-    } yield {
-      Json.obj(
-        "activeNode" -> t.activeNodeId,
-        "branchPoints" -> t.branchPoints,
-        "comments" -> t.comments,
-        "trees" -> trees,
-        "zoomLevel" -> t.zoomLevel
-      )
-    }
+    Fox.successful(Json.obj(
+      "activeNode" -> t.activeNodeId,
+      "branchPoints" -> t.branchPoints,
+      "comments" -> t.comments,
+      "trees" -> t.trees,
+      "zoomLevel" -> t.zoomLevel
+    ))
 }

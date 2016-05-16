@@ -1,14 +1,17 @@
 package models.annotation
 
-import com.scalableminds.util.geometry.{Vector3D, Point3D, BoundingBox}
+import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
 import play.api.Logger
-import models.tracing.skeleton.{SkeletonTracingService, SkeletonTracing}
-import models.tracing.volume.{VolumeTracingService, VolumeTracing}
+import models.tracing.skeleton.SkeletonTracing
+import models.tracing.volume.{VolumeTracing, VolumeTracingService}
 import scala.concurrent.Future
+
 import play.api.libs.concurrent.Execution.Implicits._
 import com.scalableminds.util.reactivemongo.DBAccessContext
 import com.scalableminds.util.tools.Fox
 import models.binary.DataSet
+import models.tracing.skeleton.persistence.SkeletonTracingService
+import play.api.libs.json.JsValue
 
 /**
  * Company: scalableminds
@@ -22,6 +25,8 @@ trait AnnotationContentService {
   def updateSettings(dataSetName: String, boundingBox: Option[BoundingBox], settings: AnnotationSettings, tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean]
 
   def updateSettings(settings: AnnotationSettings, tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean]
+
+  def updateFromJson(id: String, jsUpdate: JsValue)(implicit ctx: DBAccessContext): Fox[AType]
 
   def updateEditPosRot(editPosition: Point3D, editRotation: Vector3D, tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean]
 

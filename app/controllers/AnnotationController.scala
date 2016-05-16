@@ -24,6 +24,7 @@ import play.api.i18n.{Messages, MessagesApi}
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Enumerator
 import play.api.libs.json.{JsArray, JsObject, _}
+import play.api.mvc.Result
 import play.twirl.api.Html
 
 /**
@@ -76,24 +77,25 @@ class AnnotationController @Inject()(val messagesApi: MessagesApi) extends Contr
     Ok(empty)
   }
 
-  def combineUpdates(updates: List[AnnotationUpdate]) = updates.foldLeft(Seq.empty[JsValue]){
+  def combineUpdates(updates: List[AnnotationUpdate]) = JsArray(updates.foldLeft(Seq.empty[JsValue]){
     case (updates, AnnotationUpdate(_, _, _, JsArray(nextUpdates), _)) =>
       updates ++ nextUpdates
     case (updates, u) =>
       Logger.warn("dropping update during replay! Update: " + u)
       updates
-  }
+  })
 
   def listUpdates(typ: String, id: String)= Authenticated.async { implicit request =>
     withAnnotation(AnnotationIdentifier(typ, id)) { annotation =>
       for {
         updates <- AnnotationUpdateService.retrieveAll(typ, id, limit = Some(100))
-        combinedUpdate = JsArray(combineUpdates(updates))
+        combinedUpdate = combineUpdates(updates)
       } yield Ok(combinedUpdate)
     }
   }
 
   def transferUpdates(typ: String, id: String, fromId: String, fromTyp: String, maxVersion: Int) = Authenticated.async { implicit request =>
+    // TODO: check if this works with the actor storage of tracings
     def applyUpdates(updates: List[AnnotationUpdate], targetAnnotation: AnnotationLike): Fox[AnnotationLike] = {
       updates.splitAt(100) match {
         case (Nil, _) =>
@@ -116,11 +118,12 @@ class AnnotationController @Inject()(val messagesApi: MessagesApi) extends Contr
   }
 
   def revert(typ: String, id: String, version: Int) = Authenticated.async { implicit request =>
+    // TODO: check if this works with the actor storage of tracings
     for {
       oldAnnotation <- findAnnotation(typ, id)
       _ <- isUpdateAllowed(oldAnnotation, version).toFox
       updates <- AnnotationUpdateService.retrieveAll(typ, id, maxVersion=version)
-      combinedUpdate = JsArray(combineUpdates(updates))
+      combinedUpdate = combineUpdates(updates)
       updateableAnnotation <- isUpdateable(oldAnnotation) ?~> Messages("annotation.update.impossible")
       updatedAnnotation <- oldAnnotation.muta.resetToBase()
       result <- handleUpdates(updateableAnnotation, combinedUpdate, version)
@@ -192,17 +195,11 @@ class AnnotationController @Inject()(val messagesApi: MessagesApi) extends Contr
   }
 
   def handleUpdates(annotation: Annotation, js: JsValue, version: Int)(implicit request: AuthenticatedRequest[_]): Fox[JsObject] = {
-    js match {
-      case JsArray(jsUpdates) =>
-        for {
-          updated <- annotation.muta.updateFromJson(jsUpdates) //?~> Messages("format.json.invalid")
-        } yield {
-          TimeSpanService.logUserInteraction(request.user, Some(updated))
-          Json.obj("version" -> version)
-        }
-      case t                  =>
-        Logger.info("Failed to handle json update. Tried: " + t)
-        Failure(Messages("format.json.invalid"))
+    for {
+      updated <- annotation.muta.updateFromJson(js) //?~> Messages("format.json.invalid")
+    } yield {
+      TimeSpanService.logUserInteraction(request.user, Some(updated))
+      Json.obj("version" -> version)
     }
   }
 
