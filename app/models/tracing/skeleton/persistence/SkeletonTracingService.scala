@@ -20,7 +20,7 @@ import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import models.annotation.CompoundAnnotation._
 import models.binary.DataSet
 import models.task.Task
-import models.tracing.skeleton.{JsonTracingUpdateParser, SkeletonTracing, SkeletonTracingLike}
+import models.tracing.skeleton.{JsonTracingUpdateParser, SkeletonTracing}
 import models.tracing.skeleton.persistence.SkeletonTracingProtocol._
 import models.user.{UsedAnnotationDAO, User}
 import net.liftweb.common.{Box, Failure, Full}
@@ -105,7 +105,7 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
     (underlying ? GetSkeletonQuery(tracingId)).mapTo[SkeletonResponse].map(_.skeleton).toFox
   }
 
-  def uniqueTreePrefix(tracing: SkeletonTracingLike, user: Option[User], task: Option[Task])(tree: TreeLike): String = {
+  def uniqueTreePrefix(tracing: SkeletonTracing, user: Option[User], task: Option[Task])(tree: TreeLike): String = {
     val userName = user.map(_.abreviatedName) getOrElse ""
     val taskName = task.map(_.id) getOrElse ""
     formatHash(taskName) + "_" + userName + "_" + f"tree${tree.treeId}%03d"

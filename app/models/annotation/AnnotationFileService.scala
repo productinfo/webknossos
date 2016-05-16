@@ -9,7 +9,7 @@ import java.nio.channels.Channels
 import com.scalableminds.util.io.NamedFileStream
 import com.scalableminds.util.reactivemongo.DBAccessContext
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
-import models.tracing.skeleton.SkeletonTracingLike
+import models.tracing.skeleton.SkeletonTracing
 import org.apache.commons.io.IOUtils
 import oxalis.annotation.handler.SavedTracingInformationHandler
 import oxalis.nml.NMLService
@@ -87,7 +87,7 @@ trait AnnotationFileService extends FoxImplicits {
 
   def annotationToInputStream(): Fox[InputStream] = {
     annotation.content.flatMap {
-      case t: SkeletonTracingLike =>
+      case t: SkeletonTracing =>
         NMLService.toNML(t).map(s => IOUtils.toInputStream(s, "utf-8")).toFox
       case _ =>
         throw new Exception("Invalid content!")

@@ -1,6 +1,6 @@
 package oxalis.nml
 
-import models.tracing.skeleton.SkeletonTracingLike
+import models.tracing.skeleton.SkeletonTracing
 import net.liftweb.common.{Empty, Failure, Full, Box}
 import play.api.libs.Files
 import play.api.mvc.MultipartFormData.FilePart
@@ -22,7 +22,7 @@ import play.api.libs.Files.TemporaryFile
  */
 object NMLService extends NMLParsingService {
 
-  def toNML[T <: SkeletonTracingLike](t: T) = {
+  def toNML[T <: SkeletonTracing](t: T) = {
     val prettyPrinter = new PrettyPrinter(100, 2)
     Xml.toXML(t).map(prettyPrinter.format(_))
   }

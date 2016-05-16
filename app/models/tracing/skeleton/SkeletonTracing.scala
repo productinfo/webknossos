@@ -2,16 +2,19 @@ package models.tracing.skeleton
 
 import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
 import com.scalableminds.util.image.Color
-import com.scalableminds.util.reactivemongo.DBAccessContext
+import com.scalableminds.util.reactivemongo.{DBAccessContext, GlobalDBAccess}
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
+import com.scalableminds.util.xml.{XMLWrites, Xml}
 import models.annotation.{AnnotationContent, AnnotationSettings}
 import models.binary.DataSetDAO
 import models.tracing.CommonTracing
 import models.tracing.skeleton.persistence.SkeletonTracingService
 import net.liftweb.common.Full
+import org.apache.commons.io.IOUtils
 import oxalis.nml._
 import oxalis.nml.utils._
 import play.api.libs.concurrent.Execution.Implicits._
+import play.api.libs.iteratee.Enumerator
 import play.api.libs.json._
 import reactivemongo.play.json.BSONFormats._
 import reactivemongo.bson.BSONObjectID
@@ -31,7 +34,7 @@ case class SkeletonTracing(
   trees: List[Tree],
   id: String = BSONObjectID.generate.stringify
 )
-  extends SkeletonTracingLike with AnnotationContent with CommonTracing with TreeMergeHelpers {
+  extends AnnotationContent with CommonTracing with TreeMergeHelpers {
 
   type Self = SkeletonTracing
 
@@ -180,6 +183,16 @@ case class SkeletonTracing(
 
   // TODO: remove?
   override def saveToDB(implicit ctx: DBAccessContext): Fox[AnnotationContent] = ???
+
+  def contentType = SkeletonTracing.contentType
+
+  def downloadFileExtension = ".nml"
+
+  def toDownloadStream(implicit ctx: DBAccessContext): Fox[Enumerator[Array[Byte]]] =
+    NMLService.toNML(this).map(data => Enumerator.fromStream(IOUtils.toInputStream(data)))
+
+  override def contentData =
+    SkeletonTracing.skeletonTracingLikeWrites(this)
 }
 
 trait TreeMergeHelpers {
@@ -209,7 +222,7 @@ trait TreeMergeHelpers {
   }
 }
 
-object SkeletonTracing extends FoxImplicits{
+object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
   implicit val skeletonTracingFormat = Json.format[SkeletonTracing]
 
   val contentType = "skeletonTracing"
@@ -275,4 +288,43 @@ object SkeletonTracing extends FoxImplicits{
         Fox.empty
     }
   }
+}
+
+trait SkeletonTracingWrites extends FoxImplicits{
+
+  implicit object SkeletonTracingXMLWrites extends XMLWrites[SkeletonTracing] with GlobalDBAccess {
+    def writes(e: SkeletonTracing): Fox[scala.xml.Node] = {
+      for {
+        dataSet <- DataSetDAO.findOneBySourceName(e.dataSetName)
+        dataSource <- dataSet.dataSource.toFox
+        treesXml = Xml.toXML(e.trees.filterNot(_.nodes.isEmpty))
+        branchpoints <- Xml.toXML(e.branchPoints)
+        comments <- Xml.toXML(e.comments)
+      } yield {
+        <things>
+          <parameters>
+            <experiment name={dataSet.name}/>
+            <scale x={dataSource.scale.x.toString} y={dataSource.scale.y.toString} z={dataSource.scale.z.toString}/>
+            <offset x="0" y="0" z="0"/>
+            <time ms={e.timestamp.toString}/>{e.activeNodeId.map(id => scala.xml.XML.loadString(s"""<activeNode id="$id"/>""")).getOrElse(scala.xml.Null)}<editPosition x={e.editPosition.x.toString} y={e.editPosition.y.toString} z={e.editPosition.z.toString}/>
+            <zoomLevel zoom={e.zoomLevel.toString}/>
+          </parameters>{treesXml}<branchpoints>
+          {branchpoints}
+        </branchpoints>
+          <comments>
+            {comments}
+          </comments>
+        </things>
+      }
+    }
+  }
+
+  def skeletonTracingLikeWrites(t: SkeletonTracing) =
+    Fox.successful(Json.obj(
+      "activeNode" -> t.activeNodeId,
+      "branchPoints" -> t.branchPoints,
+      "comments" -> t.comments,
+      "trees" -> t.trees,
+      "zoomLevel" -> t.zoomLevel
+    ))
 }
