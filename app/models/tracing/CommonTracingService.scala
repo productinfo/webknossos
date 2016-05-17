@@ -12,8 +12,6 @@ import com.scalableminds.util.reactivemongo.DBAccessContext
 trait CommonTracingService extends FoxImplicits {
   def dao: SecuredBaseDAO[_ <: CommonTracing]
 
-
-
   def updateEditPosRot(editPosition: Point3D, editRotation: Vector3D, tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean] = {
     dao.withValidId(tracingId) {
       id =>

@@ -5,6 +5,7 @@ package oxalis.actor
 
 import akka.actor.{Actor, PoisonPill, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
+import play.api.Logger
 
 trait Passivation extends ALogging {
   this: Actor =>
@@ -12,7 +13,7 @@ trait Passivation extends ALogging {
   protected def passivate(receive: Receive): Receive = receive.orElse{
     // tell parent actor to send us a poisinpill
     case ReceiveTimeout =>
-      self.logInfo( s => s" $s ReceiveTimeout: passivating. ")
+      Logger.info(s" $self ReceiveTimeout: passivating. ")
       context.parent ! Passivate(stopMessage = PoisonPill)
 
     // stop

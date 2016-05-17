@@ -400,7 +400,7 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
 
   def defaultCommands: Receive = LoggingReceive.withLabel("default") {
     case other => {
-      Logger.warn("unknownCommand:  " + other.toString)
+      Logger.warn("unknownCommand:  " + other.toString + " ID: " + self.path.toString)
       sender() ! InvalidCmdAck("", "InvalidSkeletonAck")
     }
   }
