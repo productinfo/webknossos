@@ -151,6 +151,11 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
         updateStateAndNotifySender(id, event)
       }
       updateBehaviour(traceableSkeleton)
+    case SetSkeletonCmd(id, skeleton) =>
+      persist(WholeTracingChangedEvt(id, skeleton)) { event =>
+        updateStateAndNotifySender(id, event)
+      }
+      updateBehaviour(traceableSkeleton)
   }
 
   def updateStateAndNotifySender(skeletonId: String, evt: SkeletonEvt) = {
