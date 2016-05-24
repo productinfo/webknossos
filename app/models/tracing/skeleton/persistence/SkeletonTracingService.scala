@@ -20,8 +20,7 @@ import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import models.annotation.CompoundAnnotation._
 import models.binary.DataSet
 import models.task.Task
-import models.tracing.skeleton.{JsonTracingUpdateParser, SkeletonTracing}
-import models.tracing.skeleton.persistence.SkeletonTracingProtocol._
+import models.tracing.skeleton.{DBSkeletonTracingService, JsonTracingUpdateParser, SkeletonTracing}
 import models.user.{UsedAnnotationDAO, User}
 import net.liftweb.common.{Box, Failure, Full}
 import oxalis.annotation.AnnotationIdentifier
@@ -102,7 +101,10 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
 
   def findOneById(tracingId: String)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
     Logger.error(s"Looking for $tracingId")
-    (underlying ? GetSkeletonQuery(tracingId)).mapTo[SkeletonResponse].map(_.skeleton).toFox
+    (underlying ? GetSkeletonQuery(tracingId)).mapTo[SkeletonResponse].map(_.skeleton).toFox.orElse{
+      Logger.warn("USING DB tracing fallback!")
+      DBSkeletonTracingService.findOneById(tracingId).flatMap(createFrom)
+    }
   }
 
   def uniqueTreePrefix(tracing: SkeletonTracing, user: Option[User], task: Option[Task])(tree: TreeLike): String = {

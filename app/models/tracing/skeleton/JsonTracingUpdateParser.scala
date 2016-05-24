@@ -4,7 +4,7 @@ import scala.collection.generic
 
 import com.scalableminds.util.geometry.{Point3D, Vector3D}
 import com.scalableminds.util.image.Color
-import models.tracing.skeleton.persistence.SkeletonTracingProtocol._
+import models.tracing.skeleton.persistence._
 import oxalis.nml._
 import play.api.libs.functional.syntax._
 import play.api.libs.json._

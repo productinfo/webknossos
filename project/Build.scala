@@ -16,6 +16,7 @@ object Dependencies{
   val reactivePlayVersion = "0.11.13-play24"
   val braingamesVersion = "8.9.1"
   val twelvemonkeysVersion = "3.1.2"
+  val twitterChillVersion = "0.8.0"
 
   val restFb = "com.restfb" % "restfb" % "1.6.11"
   val commonsIo = "commons-io" % "commons-io" % "2.4"
@@ -30,6 +31,8 @@ object Dependencies{
   val akkaCluster = "com.typesafe.akka" %% "akka-cluster" % akkaVersion
   val akkaClusterShard = "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion
   val akkaPersistenceCassandra = "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.14"
+  val twitterChillSerialization = "com.twitter" %% "chill" % twitterChillVersion
+  val twitterChillAkkaSerialization = "com.twitter" %% "chill-akka" % twitterChillVersion
   val jerseyClient = "com.sun.jersey" % "jersey-client" % "1.8"
   val jerseyCore = "com.sun.jersey" % "jersey-core" % "1.8"
   val reactivePlay = "org.reactivemongo" %% "play2-reactivemongo" % reactivePlayVersion
@@ -161,9 +164,9 @@ object ApplicationBuild extends Build {
     akkaPersistence,
     akkaCluster,
     akkaClusterShard,
-    leveldb,
-    leveldbjni,
     akkaPersistenceCassandra,
+    twitterChillSerialization,
+    twitterChillAkkaSerialization,
     jerseyClient,
     jerseyCore,
     reactiveBson,
