@@ -16,6 +16,7 @@ import scala.concurrent.duration._
 
 import akka.util.Timeout
 import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
+import com.scalableminds.util.json.JsonUtils
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import models.annotation.CompoundAnnotation._
 import models.binary.DataSet
@@ -30,6 +31,7 @@ import reactivemongo.bson.{BSON, BSONObjectID}
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 import play.api.Play.current
+import play.api.i18n.Messages.Implicits._
 
 object SkeletonTracingService extends AnnotationContentService with FoxImplicits{
 
@@ -128,8 +130,8 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
           retrieveUnderlyingCmdResult(updateCmd)
         }).flatMap(_ => findOneById(id))
       case e: JsError =>
-        Logger.warn("Failed to parse all update commands from json. " + e)
-        Fox.empty
+        Logger.warn("Failed to parse all update commands from json. " + JsonUtils.jsError2HumanReadable(e))
+        Fox.failure(JsonUtils.jsError2HumanReadable(e))
     }
   }
 
