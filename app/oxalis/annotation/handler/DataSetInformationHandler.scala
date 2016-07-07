@@ -36,7 +36,6 @@ object DataSetInformationHandler extends AnnotationInformationHandler with FoxIm
     } yield {
       val content = SkeletonTracing(
         dataSetName,
-        Nil,
         System.currentTimeMillis(),
         Some(0),
         dataSet.defaultStart,

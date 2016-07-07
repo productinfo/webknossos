@@ -15,7 +15,7 @@ sealed trait SkeletonMsg extends Serializable {
 
 sealed trait SkeletonCmd extends SkeletonMsg
 
-case class InitSkeletonCmd(skeletonId: String, initilParams: SkeletonTracingInit) extends SkeletonCmd
+case class InitSkeletonCmd(skeletonId: String, initialParams: SkeletonTracingInit) extends SkeletonCmd
 
 case class SetSkeletonCmd(skeletonId: String, skeleton: SkeletonTracing) extends SkeletonCmd
 
@@ -31,8 +31,6 @@ case class DeleteEdgeCmd(skeletonId: String, treeId: Int, edge: Edge) extends Sk
 
 case class UpdateMetadataCmd(
   skeletonId: String,
-  branchPoints: Option[List[BranchPoint]] = None,
-  comments: Option[List[Comment]] = None,
   activeNode: Option[Int] = None,
   editPosition: Option[Point3D] = None,
   editRotation: Option[Vector3D] = None,
@@ -41,7 +39,7 @@ case class UpdateMetadataCmd(
 // Tree related commands
 case class CreateTreeCmd(skeletonId: String, tree: Tree) extends SkeletonCmd
 
-case class UpdateTreePropertiesCmd(skeletonId: String, treeId: Int, updatedId: Option[Int], color: Option[Color], name: String) extends SkeletonCmd
+case class UpdateTreePropertiesCmd(skeletonId: String, treeId: Int, updatedId: Option[Int], color: Option[Color], name: String, branchPoints: List[BranchPoint], comments: List[Comment]) extends SkeletonCmd
 
 case class MergeTreesCmd(skeletonId: String, sourceTreeId: Int, targetTreeId: Int) extends SkeletonCmd
 

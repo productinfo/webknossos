@@ -54,7 +54,7 @@ object DBNodeDAO extends SecuredBaseDAO[DBNode] {
   }
 }
 
-case class DBTree(_tracing: BSONObjectID, treeId: Int, color: Option[Color], timestamp: Long = System.currentTimeMillis, name: String = "", _id: BSONObjectID = BSONObjectID.generate){
+case class DBTree(_tracing: BSONObjectID, treeId: Int, color: Option[Color], timestamp: Long = System.currentTimeMillis, name: String = "", branchPoints: List[BranchPoint], comments: List[Comment], _id: BSONObjectID = BSONObjectID.generate){
   def nodes = DBNodeDAO.findByTree(_id)(GlobalAccessContext).map(_.map(_.node).toSet)
 
   def edges = DBEdgeDAO.findByTree(_id)(GlobalAccessContext).map(_.map(_.edge).toSet)
@@ -62,7 +62,7 @@ case class DBTree(_tracing: BSONObjectID, treeId: Int, color: Option[Color], tim
   def toTree = for{
   ns <- nodes
   es <- edges
-  } yield Tree(treeId, ns, es, color, name)
+  } yield Tree(treeId, ns, es, color, branchPoints, comments, name)
 }
 
 object DBTree {
@@ -85,14 +85,12 @@ object DBTreeDAO extends SecuredBaseDAO[DBTree] {
 
 case class DBSkeletonTracing(
   dataSetName: String,
-  branchPoints: List[BranchPoint],
   timestamp: Long,
   activeNodeId: Option[Int],
   editPosition: Point3D,
   editRotation: Vector3D,
   zoomLevel: Double,
   boundingBox: Option[BoundingBox],
-  comments: List[Comment] = Nil,
   stats: Option[SkeletonTracingStatistics],
   settings: AnnotationSettings = AnnotationSettings.skeletonDefault,
   _id: BSONObjectID = BSONObjectID.generate
@@ -100,8 +98,8 @@ case class DBSkeletonTracing(
   def DBTrees = DBTreeDAO.findByTracing(_id)(GlobalAccessContext)
 
   def trees: Fox[List[Tree]] = DBTrees.flatMap{ ts =>
-        Fox.combined(ts.map(t => t.toTree))
-      }
+    Fox.combined(ts.map(t => t.toTree))
+  }
 
 }
 
@@ -125,14 +123,12 @@ object DBSkeletonTracingService{
     } yield {
       SkeletonTracing(
         sk.dataSetName,
-        sk.branchPoints,
         sk.timestamp,
         sk.activeNodeId,
         sk.editPosition,
         sk.editRotation,
         sk.zoomLevel,
         sk.boundingBox,
-        sk.comments,
         sk.settings,
         isArchived = false,
         trees = trees,

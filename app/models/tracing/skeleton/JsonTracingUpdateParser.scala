@@ -49,11 +49,13 @@ object JsonTracingUpdateParser {
       ((__ \ "id").read[Int] and
         (__ \ "color").readNullable[Color] and
         (__ \ "timestamp").read[Long] and
-        (__ \ "name").readNullable[String]).tupled
+        (__ \ "name").readNullable[String] and
+        (__ \ "branchPoints").read[List[BranchPoint]] and
+        (__ \ "comments").read[List[Comment]]).tupled
 
     createTree.map {
-      case ((id, color, timestamp, name)) =>
-        CreateTreeCmd(skeletonId, Tree(id, Set.empty, Set.empty, color, name = name.getOrElse(nameFromId(id))))
+      case ((id, color, timestamp, name, bps, comments)) =>
+        CreateTreeCmd(skeletonId, Tree(id, Set.empty, Set.empty, color, bps, comments, name = name.getOrElse(nameFromId(id))))
     }
   }
 
@@ -71,11 +73,13 @@ object JsonTracingUpdateParser {
       ((__ \ "id").read[Int] and
         (__ \ "updatedId").readNullable[Int] and
         (__ \ "color").readNullable[Color] and
-        (__ \ "name").readNullable[String]).tupled
+        (__ \ "name").readNullable[String] and
+        (__ \ "branchPoints").read[List[BranchPoint]] and
+        (__ \ "comments").read[List[Comment]]).tupled
 
     updateTree.map {
-      case ((id, updatedId, color, name)) =>
-        UpdateTreePropertiesCmd(skeletonId, id, updatedId, color, name = name.getOrElse(nameFromId(id)))
+      case ((id, updatedId, color, name, bps, comments)) =>
+        UpdateTreePropertiesCmd(skeletonId, id, updatedId, color, name = name.getOrElse(nameFromId(id)), bps, comments)
     }
   }
 
@@ -159,16 +163,14 @@ object JsonTracingUpdateParser {
 
   private def updateTracingReads(skeletonId: String): Reads[SkeletonCmd] = {
     val updateTracing =
-      ((__ \ "branchPoints").read[List[BranchPoint]] and
-        (__ \ "comments").read[List[Comment]] and
-        (__ \ "activeNode").readNullable[Int] and
+      ((__ \ "activeNode").readNullable[Int] and
         (__ \ "editPosition").read[Point3D] and
         (__ \ "editRotation").read[Vector3D] and
         (__ \ "zoomLevel").read[Double]).tupled
 
     updateTracing.map {
-      case ((branchPoints, comments, activeNode, editPosition, editRotation, zoomLevel)) =>
-        UpdateMetadataCmd(skeletonId, Some(branchPoints), Some(comments), activeNode, Some(editPosition), Some(editRotation), Some(zoomLevel))
+      case ((activeNode, editPosition, editRotation, zoomLevel)) =>
+        UpdateMetadataCmd(skeletonId, activeNode, Some(editPosition), Some(editRotation), Some(zoomLevel))
     }
   }
 }

@@ -27,14 +27,10 @@ case class EdgeCreatedEvt(skeletonId: String, treeId: Int, edge: Edge) extends S
 
 case class EdgeDeletedEvt(skeletonId: String, treeId: Int, edge: Edge) extends SkeletonEvt
 
-case class BranchPointsUpdatedEvt(skeletonId: String, branchPoints: List[BranchPoint]) extends SkeletonEvt
-
-case class CommentsUpdatedEvt(skeletonId: String, comments: List[Comment]) extends SkeletonEvt
-
 // Tree related events
 case class TreeCreatedEvt(skeletonId: String, tree: Tree) extends SkeletonEvt
 
-case class TreePropertiesUpdatedEvt(skeletonId: String, treeId: Int, updatedId: Int, color: Option[Color], name: String) extends SkeletonEvt
+case class TreePropertiesUpdatedEvt(skeletonId: String, treeId: Int, updatedId: Int, color: Option[Color], name: String, branchPoints: List[BranchPoint], comments: List[Comment]) extends SkeletonEvt
 
 case class TreeMergedEvt(skeletonId: String, sourceTreeId: Int, targetTreeId: Int) extends SkeletonEvt
 

@@ -5,13 +5,11 @@ package models.tracing.skeleton.persistence
 
 import scala.concurrent.duration._
 
-import akka.actor.{ActorLogging, Props}
+import akka.actor.Props
 import akka.cluster.sharding.ShardRegion
 import akka.event.LoggingReceive
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
-import com.scalableminds.util.image.Color
-import models.annotation.AnnotationSettings
+import com.scalableminds.util.geometry.BoundingBox
 import models.tracing.skeleton.SkeletonTracing
 import oxalis.actor.{ALogging, Passivation}
 import oxalis.nml._
@@ -43,8 +41,6 @@ object SkeletonTracingProcessor {
 
 class SkeletonTracingProcessor extends PersistentActor with Passivation with ALogging {
 
-  import SkeletonTracingProcessor._
-
   var state: Option[SkeletonTracing] = None
 
   /** passivate the entity when no activity for 1 minute */
@@ -57,45 +53,41 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
     */
   private def updateState(evt: SkeletonEvt, state: Option[SkeletonTracing]): Option[SkeletonTracing] = {
     evt match {
-      case WholeTracingChangedEvt(skeletonId, skeleton)                           =>
+      case WholeTracingChangedEvt(skeletonId, skeleton)                                                 =>
         Some(skeleton)
-      case NodeCreatedEvt(skeletonId, treeId, node)                               =>
+      case NodeCreatedEvt(skeletonId, treeId, node)                                                     =>
         state.map(_.withNewNodeInTree(treeId, node))
-      case NodeDeletedEvt(skeletonId, treeId, node)                               =>
+      case NodeDeletedEvt(skeletonId, treeId, node)                                                     =>
         state.map(_.withoutNodeInTree(treeId, node))
-      case NodePropertiesUpdatedEvt(skeletonId, treeId, node)                     =>
+      case NodePropertiesUpdatedEvt(skeletonId, treeId, node)                                           =>
         state.map(_.withUpdatedNode(treeId, node))
-      case EdgeCreatedEvt(skeletonId, treeId, edge)                               =>
+      case EdgeCreatedEvt(skeletonId, treeId, edge)                                                     =>
         state.map(_.withNewEdgeInTree(treeId, edge))
-      case EdgeDeletedEvt(skeletonId, treeId, edge)                               =>
+      case EdgeDeletedEvt(skeletonId, treeId, edge)                                                     =>
         state.map(_.withoutEdgeInTree(treeId, edge))
-      case BranchPointsUpdatedEvt(skeletonId, branchPoints)                       =>
-        state.map(_.copy(branchPoints = branchPoints))
-      case CommentsUpdatedEvt(skeletonId, comments)                               =>
-        state.map(_.copy(comments = comments))
-      case TreeCreatedEvt(skeletonId, tree)                                       =>
+      case TreeCreatedEvt(skeletonId, tree)                                                             =>
         state.map(s => s.copy(trees = tree :: s.trees))
-      case TreePropertiesUpdatedEvt(skeletonId, treeId, updatedId, color, name)   =>
-        state.map(_.withUpdatedTreeProperties(treeId, updatedId, color, name))
-      case TreeMergedEvt(skeletonId, sourceTreeId, targetTreeId)                  =>
+      case TreePropertiesUpdatedEvt(skeletonId, treeId, updatedId, color, name, branchPoints, comments) =>
+        state.map(_.withUpdatedTreeProperties(treeId, updatedId, color, name, branchPoints, comments))
+      case TreeMergedEvt(skeletonId, sourceTreeId, targetTreeId)                                        =>
         state.map(_.withMergedTrees(sourceTreeId, targetTreeId))
-      case TreeComponentMovedEvt(skeletonId, sourceTreeId, targetTreeId, nodeIds) =>
+      case TreeComponentMovedEvt(skeletonId, sourceTreeId, targetTreeId, nodeIds)                       =>
         state.map(_.withMovedTreeComponent(sourceTreeId, targetTreeId, nodeIds.toSet))
-      case TreeDeletedEvt(skeletonId, treeId)                                     =>
+      case TreeDeletedEvt(skeletonId, treeId)                                                           =>
         state.map(_.withoutTree(treeId))
-      case ActiveNodeUpdatedEvt(skeletonId, activeNode)                           =>
+      case ActiveNodeUpdatedEvt(skeletonId, activeNode)                                                 =>
         state.map(_.copy(activeNodeId = activeNode))
-      case EditViewUpdatedEvt(skeletonId, editPosition, editRotation, zoomLevel)  =>
+      case EditViewUpdatedEvt(skeletonId, editPosition, editRotation, zoomLevel)                        =>
         state.map(_.copy(editPosition = editPosition, editRotation = editRotation, zoomLevel = zoomLevel))
-      case ArchivedTracingEvt(skeletonId)                                         =>
+      case ArchivedTracingEvt(skeletonId)                                                               =>
         state.map(_.copy(isArchived = true))
-      case UpdatedAnnotationSettingsEvt(skeletonId, settings)                     =>
+      case UpdatedAnnotationSettingsEvt(skeletonId, settings)                                           =>
         state.map(_.copy(settings = settings))
-      case UpdatedBoundingBoxEvt(skeletonId, boundingBox)                         =>
+      case UpdatedBoundingBoxEvt(skeletonId, boundingBox)                                               =>
         state.map(_.copy(boundingBox = boundingBox))
-      case UpdatedDataSetEvt(skeletonId, dataSetName)                             =>
+      case UpdatedDataSetEvt(skeletonId, dataSetName)                                                   =>
         state.map(_.copy(dataSetName = dataSetName))
-      case e                                                                      =>
+      case e                                                                                            =>
         e.logError("Unknown Message: " + _.toString)
         state
     }
@@ -103,10 +95,12 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
 
   private def initSkeleton(id: String, init: SkeletonTracingInit) = {
     val trees =
-      if (init.insertStartAsNode)
-        List(Tree.createFrom(init.start, init.rotation))
-      else
-        Nil
+      if (init.insertStartAsNode) {
+        val node = Node(1, init.start, init.rotation)
+        val branchPoints = if (init.isFirstBranchPoint) List(BranchPoint(node.id, System.currentTimeMillis)) else Nil
+        List(Tree.createFrom(node).copy(branchPoints = branchPoints))
+      } else
+          Nil
 
     val box: Option[BoundingBox] = init.boundingBox.flatMap { box =>
       if (box.isEmpty)
@@ -115,17 +109,8 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
         Some(box)
     }
 
-    val branchPoints =
-      if(init.isFirstBranchPoint)
-      // Find the first node and create a branchpoint at its id
-        trees.headOption.flatMap(_.nodes.headOption).map { node =>
-          BranchPoint(node.id)
-        }.toList
-      else Nil
-
     SkeletonTracing(
       init.dataSetName,
-      branchPoints = branchPoints,
       timestamp = System.currentTimeMillis,
       activeNodeId = if (init.insertStartAsNode) Some(1) else None,
       editPosition = init.start,
@@ -151,7 +136,7 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
         updateStateAndNotifySender(id, event)
       }
       updateBehaviour(traceableSkeleton)
-    case SetSkeletonCmd(id, skeleton) =>
+    case SetSkeletonCmd(id, skeleton)    =>
       persist(WholeTracingChangedEvt(id, skeleton)) { event =>
         updateStateAndNotifySender(id, event)
       }
@@ -230,11 +215,7 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
           cmd.editPosition getOrElse tracing.editPosition,
           cmd.editRotation getOrElse tracing.editRotation,
           cmd.zoomLevel getOrElse tracing.zoomLevel) ::
-          List(
-            if (tracing.activeNodeId != cmd.activeNode) Some(ActiveNodeUpdatedEvt(cmd.skeletonId, cmd.activeNode)) else None,
-            cmd.branchPoints.map(bp => BranchPointsUpdatedEvt(cmd.skeletonId, bp)),
-            cmd.comments.map(cm => CommentsUpdatedEvt(cmd.skeletonId, cm))
-          ).flatten
+          (if (tracing.activeNodeId != cmd.activeNode) List(ActiveNodeUpdatedEvt(cmd.skeletonId, cmd.activeNode)) else Nil)
       } getOrElse Nil
 
       handleCmd(
@@ -254,7 +235,7 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
 
     case cmd: UpdateTreePropertiesCmd =>
       val event = state.flatMap(_.tree(cmd.treeId)).map { tree =>
-        TreePropertiesUpdatedEvt(cmd.skeletonId, tree.treeId, cmd.updatedId getOrElse tree.treeId, cmd.color, cmd.name)
+        TreePropertiesUpdatedEvt(cmd.skeletonId, tree.treeId, cmd.updatedId getOrElse tree.treeId, cmd.color, cmd.name, cmd.branchPoints, cmd.comments)
       }
 
       handleCmd(
@@ -291,10 +272,8 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
     case cmd: ResetSkeletonCmd =>
       val events = state.map { tracing =>
         val treeDeletions = tracing.trees.map(t => TreeDeletedEvt(cmd.skeletonId, t.treeId))
-        val branchPointsDeletion = BranchPointsUpdatedEvt(cmd.skeletonId, List.empty)
-        val commentsDeletion = CommentsUpdatedEvt(cmd.skeletonId, List.empty)
 
-        commentsDeletion :: branchPointsDeletion :: treeDeletions
+        treeDeletions
       } getOrElse Nil
 
       handleCmd(

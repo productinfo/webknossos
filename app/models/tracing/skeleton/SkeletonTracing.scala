@@ -21,14 +21,12 @@ import reactivemongo.bson.BSONObjectID
 
 case class SkeletonTracing(
   dataSetName: String,
-  branchPoints: List[BranchPoint],
   timestamp: Long,
   activeNodeId: Option[Int],
   editPosition: Point3D,
   editRotation: Vector3D,
   zoomLevel: Double,
   boundingBox: Option[BoundingBox],
-  comments: List[Comment] = Nil,
   settings: AnnotationSettings = AnnotationSettings.skeletonDefault,
   isArchived: Boolean,
   trees: List[Tree],
@@ -104,9 +102,9 @@ case class SkeletonTracing(
     this.copy(trees = tree :: trees.filter(_.treeId != treeId))
   }
 
-  def withUpdatedTreeProperties(treeId: Int, updatedId: Int, color: Option[Color], name: String) = {
+  def withUpdatedTreeProperties(treeId: Int, updatedId: Int, color: Option[Color], name: String, branchPoints: List[BranchPoint], comments: List[Comment]) = {
     treeMap.get(treeId).map { tree =>
-      val updatedTree = tree.copy(treeId = updatedId, color = color, name = name)
+      val updatedTree = tree.copy(treeId = updatedId, color = color, name = name, branchPoints = branchPoints, comments = comments)
       withUpdatedTree(treeId, updatedTree)
     }.getOrElse(this)
   }
@@ -161,15 +159,8 @@ case class SkeletonTracing(
         val sourceTrees = s.trees
         val nodeMapping = calculateNodeMapping(sourceTrees, trees)
         val mergedTrees = mergeTrees(sourceTrees, trees, nodeMapping)
-        val mergedBranchPoints = branchPoints ::: s.branchPoints.map(b => b.copy(id = nodeMapping(b.id)))
-        val mergedComments = comments ::: s.comments.map(c => c.copy(node = nodeMapping(c.node)))
         val mergedBoundingBox = mergeBoundingBoxes(boundingBox, s.boundingBox)
-        val result =
-          this.copy(
-            trees = mergedTrees,
-            branchPoints = mergedBranchPoints,
-            comments = mergedComments,
-            boundingBox = mergedBoundingBox)
+        val result = this.copy(trees = mergedTrees, boundingBox = mergedBoundingBox)
         Fox.successful(result)
       case s                  =>
         Fox.failure("Can't merge annotation content of a different type into TemporarySkeletonTracing. Tried to merge " + s.id)
@@ -250,14 +241,12 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
     start.map {
       SkeletonTracing(
         nml.dataSetName,
-        nml.branchPoints,
         System.currentTimeMillis(),
         nml.activeNodeId,
         _,
         Vector3D(0,0,0),
         SkeletonTracing.defaultZoomLevel,
         box,
-        nml.comments,
         settings,
         isArchived = false,
         nml.trees,
@@ -298,8 +287,8 @@ trait SkeletonTracingWrites extends FoxImplicits{
         dataSet <- DataSetDAO.findOneBySourceName(e.dataSetName)
         dataSource <- dataSet.dataSource.toFox
         treesXml = Xml.toXML(e.trees.filterNot(_.nodes.isEmpty))
-        branchpoints <- Xml.toXML(e.branchPoints)
-        comments <- Xml.toXML(e.comments)
+        branchpoints <- Xml.toXML(e.trees.flatMap(_.branchPoints).sortBy(-_.timestamp))
+        comments <- Xml.toXML(e.trees.flatMap(_.comments))
       } yield {
         <things>
           <parameters>
@@ -322,8 +311,6 @@ trait SkeletonTracingWrites extends FoxImplicits{
   def skeletonTracingLikeWrites(t: SkeletonTracing) =
     Fox.successful(Json.obj(
       "activeNode" -> t.activeNodeId,
-      "branchPoints" -> t.branchPoints,
-      "comments" -> t.comments,
       "trees" -> t.trees,
       "zoomLevel" -> t.zoomLevel
     ))
