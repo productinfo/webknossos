@@ -229,12 +229,6 @@ class TaskController @Inject() (val messagesApi: MessagesApi) extends Controller
     }
   }
 
-  def requestAssignmentFor(user: User)(implicit ctx: DBAccessContext) =
-    TaskService.findAssignableFor(user)
-
-  def getAvailableTasksFor(user: User)(implicit ctx: DBAccessContext): Fox[List[Task]] =
-    TaskService.allNextTasksForUser(user)
-
   def getProjectsFor(tasks: List[Task])(implicit ctx: DBAccessContext): Future[List[Project]] =
     Fox.serialSequence(tasks)(_.project).map(_.flatten).map(_.distinct)
 
@@ -260,7 +254,7 @@ class TaskController @Inject() (val messagesApi: MessagesApi) extends Controller
 
   def tryToGetNextAssignmentFor(user: User, retryCount: Int = 20)(implicit ctx: DBAccessContext): Fox[OpenAssignment] = {
     val s = System.currentTimeMillis()
-    requestAssignmentFor(user).futureBox.flatMap {
+    TaskService.findAssignableFor(user).futureBox.flatMap {
       case Full(assignment) =>
         OpenAssignmentService.remove(assignment).flatMap { removeResult =>
           if (removeResult.n >= 1)
