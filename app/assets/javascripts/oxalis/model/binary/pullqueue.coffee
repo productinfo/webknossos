@@ -195,7 +195,7 @@ class PullQueue
 
 
   addAll : (items) ->
-  
+
     console.log(JSON.stringify(items))
     @queue = @queue.concat(items)
 
