@@ -23,7 +23,6 @@ import play.api.libs.functional.syntax._
 import com.scalableminds.util.tools.ExtendedTypes.ExtendedString
 import models.user.time._
 import com.scalableminds.util.tools.DefaultConverters._
-
 import scala.text
 
 class UserController @Inject()(val messagesApi: MessagesApi)
@@ -32,6 +31,8 @@ class UserController @Inject()(val messagesApi: MessagesApi)
   with Secured
   with Dashboard
   with FoxImplicits {
+
+  val defaultAnnotationLimit = 1000
 
   def empty = Authenticated { implicit request =>
     Ok(views.html.main()(Html("")))
@@ -54,17 +55,17 @@ class UserController @Inject()(val messagesApi: MessagesApi)
     }
   }
 
-  def annotations(isFinished: Option[Boolean]) = Authenticated.async { implicit request =>
+  def annotations(isFinished: Option[Boolean], limit: Option[Int]) = Authenticated.async { implicit request =>
     for {
-      content <- dashboardExploratoryAnnotations(request.user, request.user, isFinished)
+      content <- dashboardExploratoryAnnotations(request.user, request.user, isFinished, limit getOrElse defaultAnnotationLimit)
     } yield {
       Ok(content)
     }
   }
 
-  def tasks = Authenticated.async { implicit request =>
+  def tasks(isFinished: Option[Boolean], limit: Option[Int]) = Authenticated.async { implicit request =>
     for {
-      content <- dashboardTaskAnnotations(request.user, request.user)
+      content <- dashboardTaskAnnotations(request.user, request.user, isFinished, limit getOrElse defaultAnnotationLimit)
     } yield {
       Ok(content)
     }
@@ -83,19 +84,19 @@ class UserController @Inject()(val messagesApi: MessagesApi)
     }
   }
 
-  def userAnnotations(userId: String, isFinished: Option[Boolean]) = Authenticated.async { implicit request =>
+  def userAnnotations(userId: String, isFinished: Option[Boolean], limit: Option[Int]) = Authenticated.async { implicit request =>
     for {
       user <- UserDAO.findOneById(userId) ?~> Messages("user.notFound")
-      content <- dashboardExploratoryAnnotations(user, request.user, isFinished)
+      content <- dashboardExploratoryAnnotations(user, request.user, isFinished, limit getOrElse defaultAnnotationLimit)
     } yield {
       Ok(content)
     }
   }
 
-  def userTasks(userId: String) = Authenticated.async { implicit request =>
+  def userTasks(userId: String, isFinished: Option[Boolean], limit: Option[Int]) = Authenticated.async { implicit request =>
     for {
       user <- UserDAO.findOneById(userId) ?~> Messages("user.notFound")
-      content <- dashboardTaskAnnotations(user, request.user)
+      content <- dashboardTaskAnnotations(user, request.user, isFinished, limit getOrElse defaultAnnotationLimit)
     } yield {
       Ok(content)
     }
@@ -159,7 +160,7 @@ class UserController @Inject()(val messagesApi: MessagesApi)
 
   def ensureProperTeamAdministration(user: User, teams: List[(TeamMembership, Team)]) = {
     Fox.combined(teams.map {
-      case (TeamMembership(_, Role.Admin), team) if !team.couldBeAdministratedBy(user) =>
+      case (TeamMembership(_, Role.Admin), team) if(!team.couldBeAdministratedBy(user) && !team.parent.exists(p => teams.exists(_._1.team == p))) =>
         Fox.failure(Messages("team.admin.notPossibleBy", team.name, user.name))
       case (_, team)                                                                   =>
         Fox.successful(team)
@@ -183,7 +184,7 @@ class UserController @Inject()(val messagesApi: MessagesApi)
           user <- UserDAO.findOneById(userId) ?~> Messages("user.notFound")
           _ <- user.isEditableBy(request.user) ?~> Messages("notAllowed")
           teams <- Fox.combined(assignedMemberships.map(t => TeamDAO.findOneByName(t.team)(GlobalAccessContext) ?~> Messages("team.notFound")))
-          allTeams <- Fox.sequenceOfFulls(user.teams.map(t => TeamDAO.findOneByName(t.team)(GlobalAccessContext)))
+          allTeams <- Fox.serialSequence(user.teams)(t => TeamDAO.findOneByName(t.team)(GlobalAccessContext)).map(_.flatten)
           teamsWithoutUpdate = user.teams.filterNot(t => issuingUser.isAdminOf(t.team))
           assignedMembershipWTeams = assignedMemberships.zip(teams)
           teamsWithUpdate = assignedMembershipWTeams.filter(t => issuingUser.isAdminOf(t._1.team))

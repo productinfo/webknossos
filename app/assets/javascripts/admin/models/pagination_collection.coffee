@@ -44,7 +44,7 @@ class PaginationCollection
     @listenTo(@fullCollection, "remove", @_passthroughEvent("remove"))
     @listenTo(@fullCollection, "sync", @_passthroughEvent("sync"))
 
-    @_reset = _.debounce(@_reset, 50)
+    @_reset = _.debounce(@_resetNow, 50)
     return
 
 
@@ -69,7 +69,7 @@ class PaginationCollection
 
   setPageSize : (pageSize) ->
     @state.pageSize = pageSize
-    @_reset()
+    @_resetNow()
     return
 
 
@@ -115,8 +115,10 @@ class PaginationCollection
       @state.filterQuery = ""
       @state.filter = null
     else
-      words = _.map(query.match(/\w+/ig), (element) -> element.toLowerCase())
-      pattern = "(" + _.uniq(words).join("|") + ")"
+      words = _.map(query.split(" "),
+        (element) -> element.toLowerCase().replace(/[\-\[\]{}()\*\+\?\.,\\\^\$\|\#\s]/g, "\\$&"))
+      uniques = _.filter(_.uniq(words), (element) -> element != '')
+      pattern = "(" + uniques.join("|") + ")"
       regexp = new RegExp(pattern, "igm")
 
       @state.filterQuery = query
@@ -146,13 +148,18 @@ class PaginationCollection
     clonedCollection.setPageSize(@state.pageSize)
     return clonedCollection
 
+  map : (args...) ->
+    return _.map(@models, args...)
 
   _lastPageIndex : ->
     return Math.ceil(@currentModels.length / @state.pageSize) - 1
 
   _passthroughEvent : (eventType) ->
     return (args...) ->
-      @_reset()
+      if eventType == "sync"
+        @_resetNow()
+      else
+        @_reset()
       @trigger(eventType, args...)
       return
 
@@ -176,7 +183,7 @@ class PaginationCollection
     return
 
 
-  _reset : ->
+  _resetNow : ->
     @_resetModels()
     @models = @currentModels.slice(
       @state.currentPage * @state.pageSize,

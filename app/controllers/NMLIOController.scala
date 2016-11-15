@@ -16,6 +16,9 @@ import play.api.libs.json._
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 
+import com.scalableminds.util.tools.Fox
+import models.project.{Project, ProjectDAO}
+
 class NMLIOController @Inject()(val messagesApi: MessagesApi) extends Controller with Secured {
 
   private def nameForNMLs(fileNames: Seq[String]) =
@@ -59,7 +62,7 @@ class NMLIOController @Inject()(val messagesApi: MessagesApi) extends Controller
     def createProjectZip(project: Project) =
       for {
         tasks <- TaskDAO.findAllByProject(project.name)
-        annotations <- Future.traverse(tasks)(_.annotations).map(_.flatten.filter(_.state.isFinished))
+        annotations <- Fox.serialSequence(tasks)(_.annotations).map(_.flatten.filter(_.state.isFinished))
         zip <- AnnotationService.zipAnnotations(annotations, projectName + "_nmls.zip")
       } yield zip
 
@@ -89,7 +92,7 @@ class NMLIOController @Inject()(val messagesApi: MessagesApi) extends Controller
     def createTaskTypeZip(taskType: TaskType) =
       for {
         tasks <- TaskDAO.findAllByTaskType(taskType._id)
-        tracings <- Future.traverse(tasks)(_.annotations).map(_.flatten.filter(_.state.isFinished))
+        tracings <- Fox.serialSequence(tasks)(_.annotations).map(_.flatten.filter(_.state.isFinished))
         zip <- AnnotationService.zipAnnotations(tracings, taskType.summary + "_nmls.zip")
       } yield zip
 
@@ -103,7 +106,7 @@ class NMLIOController @Inject()(val messagesApi: MessagesApi) extends Controller
   def userDownload(userId: String) = Authenticated.async { implicit request =>
     for {
       user <- UserService.findOneById(userId, useCache = true) ?~> Messages("user.notFound")
-      annotations <- AnnotationService.findTasksOf(user).map(_.filter(_.state.isFinished))
+      annotations <- AnnotationService.findTasksOf(user, isFinished = Some(true), limit = Int.MaxValue)
       zipped <- AnnotationService.zipAnnotations(annotations, user.abreviatedName + "_nmls.zip")
     } yield {
       Ok.sendFile(zipped.file)

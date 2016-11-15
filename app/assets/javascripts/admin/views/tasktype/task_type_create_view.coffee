@@ -7,7 +7,7 @@ TeamCollection = require("admin/models/team/team_collection")
 SelectionView  = require("admin/views/selection_view")
 Toast          = require("libs/toast")
 
-class TaskTypeCreateView extends Marionette.LayoutView
+class TaskTypeCreateView extends Marionette.View
 
   template : _.template("""
     <div class="row">
@@ -35,7 +35,7 @@ class TaskTypeCreateView extends Marionette.LayoutView
             <div class="form-group">
               <label class="col-sm-2 control-label" for="description">Description</label>
               <div class="col-sm-9">
-              <textarea id="description" name="description" class="form-control" value="<%- description %>"></textarea>
+              <textarea id="description" name="description" class="form-control"><%- description %></textarea>
               </div>
             </div>
 
@@ -55,12 +55,12 @@ class TaskTypeCreateView extends Marionette.LayoutView
               <div class="col-sm-9">
 
                 <label class="col-sm-3" for="somaClickingAllowed">
-                  <input type="checkbox" id="somaClickingAllowed" name="settings[somaClickingAllowed"] <%- isChecked(settings.somaClickingAllowed) %>>
+                  <input type="checkbox" id="somaClickingAllowed" name="settings[somaClickingAllowed]" <%- isChecked(settings.somaClickingAllowed) %>>
                   Allow Soma clicking
                 </label>
 
                 <label class="col-sm-3" for="branchPointsAllowed">
-                  <input type="checkbox" id="branchPointsAllowed" name="settings[branchPointsAllowed"] <%- isChecked(settings.branchPointsAllowed) %>>
+                  <input type="checkbox" id="branchPointsAllowed" name="settings[branchPointsAllowed]" <%- isChecked(settings.branchPointsAllowed) %>>
                   Allow Branchpoints
                 </label>
 
@@ -128,7 +128,7 @@ class TaskTypeCreateView extends Marionette.LayoutView
   """)
   className : "container wide task-types-administration"
 
-  templateHelpers : ->
+  templateContext : ->
     getTitle : => if @isEditingMode then "Update" else "Create"
     isChecked : (bool) -> return "checked" if bool
     isSelected : (bool) -> return "selected" if bool
@@ -188,12 +188,12 @@ class TaskTypeCreateView extends Marionette.LayoutView
       name : "team"
       required : true
     )
-    @team.show(teamSelectionView)
+    @showChildView("team", teamSelectionView)
 
     @ui.multiselect.multiselect()
 
 
-  onDestroy : ->
+  onBeforeDestroy : ->
 
     @ui.multiselect.multiselect("destroy")
 

@@ -24,7 +24,6 @@ import models.task.Task
 import models.tracing.skeleton.{DBSkeletonTracingService, JsonTracingUpdateParser, SkeletonTracing}
 import models.user.{UsedAnnotationDAO, User}
 import net.liftweb.common.{Box, Failure, Full}
-import oxalis.annotation.AnnotationIdentifier
 import play.api.libs.concurrent.Akka
 import play.api.{Logger, Play}
 import reactivemongo.bson.{BSON, BSONObjectID}
@@ -83,7 +82,7 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
   }
 
   def createFrom(nmls: List[NML], boundingBox: Option[BoundingBox], settings: AnnotationSettings)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
-    SkeletonTracing.createFrom(nmls, boundingBox, settings).flatMap { temporary =>
+    SkeletonTracing.createFrom(nmls, boundingBox, Some(settings)).flatMap { temporary =>
       createFrom(temporary)
     }
   }

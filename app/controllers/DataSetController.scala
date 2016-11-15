@@ -44,6 +44,11 @@ class DataSetController @Inject()(val messagesApi: MessagesApi) extends Controll
 
   val ThumbnailCacheDuration = 1 day
 
+  val dataSetPublicReads =
+    ((__ \ 'description).readNullable[String] and
+      (__ \ 'isPublic).read[Boolean]).tupled
+
+
   def view(dataSetName: String) = UserAwareAction.async { implicit request =>
     for {
       dataSet <- DataSetDAO.findOneBySourceName(dataSetName) ?~> Messages("dataSet.notFound", dataSetName)
@@ -56,15 +61,25 @@ class DataSetController @Inject()(val messagesApi: MessagesApi) extends Controll
 
     def imageFromCacheIfPossible(dataSet: DataSet) =
     // We don't want all images to expire at the same time. Therefore, we add a day of randomness, hence the 1 day
-      Cache.getOrElse(s"thumbnail-$dataSetName*$dataLayerName",
-        (ThumbnailCacheDuration.toSeconds + math.random * 1.day.toSeconds).toInt) {
-        DataStoreHandler.requestDataLayerThumbnail(dataSet, dataLayerName, ThumbnailWidth, ThumbnailHeight)
+      Cache.get(s"thumbnail-$dataSetName*$dataLayerName") match {
+        case Some(a: Array[Byte]) =>
+          Fox.successful(a)
+        case _ =>
+          DataStoreHandler.requestDataLayerThumbnail(dataSet, dataLayerName, ThumbnailWidth, ThumbnailHeight).map{
+            result =>
+              Cache.set(s"thumbnail-$dataSetName*$dataLayerName",
+                result,
+                (ThumbnailCacheDuration.toSeconds + math.random * 2.hours.toSeconds).toInt)
+              result
+          }
       }
+
+
 
     for {
       dataSet <- DataSetDAO.findOneBySourceName(dataSetName) ?~> Messages("dataSet.notFound", dataSetName)
       layer <- DataSetService.getDataLayer(dataSet, dataLayerName) ?~> Messages("dataLayer.notFound", dataLayerName)
-      image <- imageFromCacheIfPossible(dataSet) ?~> Messages("dataLayer.thumbnailFailed")
+      image <- imageFromCacheIfPossible(dataSet)
     } yield {
       Ok(image).withHeaders(
         CONTENT_LENGTH -> image.length.toString,
@@ -74,6 +89,11 @@ class DataSetController @Inject()(val messagesApi: MessagesApi) extends Controll
   }
 
   def empty = Authenticated { implicit request =>
+    Ok(views.html.main()(Html("")))
+  }
+
+  // TODO: find a better way to ignore parameters
+  def emptyWithWildcard(param: String) = Authenticated { implicit request =>
     Ok(views.html.main()(Html("")))
   }
 
@@ -100,7 +120,7 @@ class DataSetController @Inject()(val messagesApi: MessagesApi) extends Controll
       dataSet <- DataSetDAO.findOneBySourceName(dataSetName) ?~> Messages("dataSet.notFound", dataSetName)
       users <- UserService.findByTeams(dataSet.allowedTeams, includeAnonymous = false)
     } yield {
-      Ok(Writes.list(User.userCompactWrites(request.user)).writes(users))
+      Ok(Writes.list(User.userCompactWrites).writes(users))
     }
   }
 
@@ -111,6 +131,20 @@ class DataSetController @Inject()(val messagesApi: MessagesApi) extends Controll
       Ok(DataSet.dataSetPublicWrites(request.userOpt).writes(dataSet))
     }
   }
+
+  def update(dataSetName: String) = Authenticated.async(parse.json) { implicit request =>
+    withJsonBodyUsing(dataSetPublicReads) {
+      case (description, isPublic) =>
+      for {
+        dataSet <- DataSetDAO.findOneBySourceName(dataSetName) ?~> Messages("dataSet.notFound", dataSetName)
+        _ <- allowedToAdministrate(request.user, dataSet)
+        updatedDataSet <- DataSetService.update(dataSet, description, isPublic)
+      } yield {
+        Ok(DataSet.dataSetPublicWrites(request.userOpt).writes(updatedDataSet))
+      }
+    }
+  }
+
 
   def importDataSet(dataSetName: String) = Authenticated.async { implicit request =>
     for {
@@ -171,7 +205,7 @@ class DataSetController @Inject()(val messagesApi: MessagesApi) extends Controll
             upload = DataSourceUpload(name, team, zipFile.ref.file.getAbsolutePath, Some(settings))
             _ <- DataStoreHandler.uploadDataSource(upload)
           } yield {
-            Ok(Json.obj())
+            JsonOk(Messages("dataSet.upload.success"))
           }
       })
   }
@@ -195,7 +229,7 @@ class DataSetController @Inject()(val messagesApi: MessagesApi) extends Controll
           ndProject <- NDServerConnection.requestProjectInformationFromNDStore(server, name, token)
           dataSet <- ND2WK.dataSetFromNDProject(ndProject, team)
           _ <-  DataSetDAO.insert(dataSet)(GlobalAccessContext)
-        } yield Ok
+        } yield JsonOk(Messages("dataSet.create.success"))
     }
 
   def create(typ: String) = Authenticated.async(parse.json) { implicit request =>

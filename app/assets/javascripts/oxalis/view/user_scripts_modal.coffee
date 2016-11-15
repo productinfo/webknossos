@@ -1,7 +1,7 @@
 _          = require("lodash")
 Marionette = require("backbone.marionette")
 
-class UserScriptsModalView extends Marionette.ItemView
+class UserScriptsModalView extends Marionette.View
 
   className : "modal fade"
   template : _.template("""
@@ -34,11 +34,18 @@ class UserScriptsModalView extends Marionette.ItemView
 
 
   show : ->
+
     @$el.modal("show")
 
 
   handleAddClick : ->
-    eval(@ui.inputBox.val())
+
+    try
+      eval(@ui.inputBox.val())
+      # close modal if the script executed successfully
+      @$el.modal("hide")
+    catch error
+      alert(error)
 
 
 module.exports = UserScriptsModalView

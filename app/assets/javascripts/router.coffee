@@ -19,12 +19,15 @@ class Router extends BaseRouter
     "/tasks/create"                      : "taskCreate"
     "/tasks/:id/edit"                    : "taskEdit"
     "/projects"                          : "projects"
+    "/projects/create"                   : "projectCreate"
     "/projects/:name/tasks"              : "projectTasks"
+    "/projects/:id/edit"                 : "projectEdit"
     "/annotations/:type/:id(/readOnly)"  : "tracingView"
     "/datasets/:id/view"                 : "tracingViewPublic"
     "/dashboard"                         : "dashboard"
     "/datasets"                          : "dashboard"
     "/datasets/upload"                   : "datasetAdd"
+    "/datasets/:id/edit"                 : "datasetEdit"
     "/users/:id/details"                 : "dashboard"
     "/taskTypes"                         : "taskTypes"
     "/taskTypes/create"                  : "taskTypesCreate"
@@ -79,6 +82,32 @@ class Router extends BaseRouter
     @showWithPagination("ProjectListView", "ProjectCollection", {addButtonText : "Create New Project"})
 
 
+  projectCreate : ->
+
+    require(["admin/views/project/project_create_view", "admin/models/project/project_model"], (ProjectCreateView, ProjectModel) =>
+
+      model = new ProjectModel()
+      view = new ProjectCreateView(model : model)
+
+      @changeView(view)
+      @hideLoadingSpinner()
+    )
+
+
+  projectEdit : (projectName) ->
+
+    require(["admin/views/project/project_edit_view", "admin/models/project/project_model"], (ProjectEditView, ProjectModel) =>
+
+      model = new ProjectModel(name : projectName)
+      view = new ProjectEditView(model : model)
+
+      @listenTo(model, "sync", ->
+        @changeView(view)
+        @hideLoadingSpinner()
+      )
+    )
+
+
   statistics : ->
 
     @showAdminView("StatisticView")
@@ -87,6 +116,20 @@ class Router extends BaseRouter
   datasetAdd : ->
 
     @showAdminView("DatasetAddView")
+
+
+  datasetEdit : (datasetID) ->
+
+    require(["admin/views/dataset/dataset_edit_view", "admin/models/dataset/dataset_model"], (DatasetEditView, DatasetModel) =>
+
+      model = new DatasetModel(name : datasetID)
+      view = new DatasetEditView(model : model)
+
+      @listenTo(model, "sync", ->
+        @changeView(view)
+        @hideLoadingSpinner()
+      )
+    )
 
 
   users : ->

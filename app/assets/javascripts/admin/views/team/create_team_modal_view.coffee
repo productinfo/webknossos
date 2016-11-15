@@ -37,6 +37,7 @@ class CreateTeamModalView extends ModalView
 
   events :
     "submit form" : "addNewTeam"
+    "click .btn-primary" : "addNewTeam"
 
   regions :
     "parentTeams" : ".parent-teams"
@@ -70,7 +71,7 @@ class CreateTeamModalView extends ModalView
 
   onRender : ->
 
-    @parentTeams.show(@teamSelectionView)
+    @showChildView("parentTeams", @teamSelectionView)
 
 
 module.exports = CreateTeamModalView

@@ -2,7 +2,7 @@ _                 = require("lodash")
 Marionette        = require("backbone.marionette")
 TemplateHelpers   = require("libs/template_helpers")
 
-class SpotlightDatasetView extends Marionette.ItemView
+class SpotlightDatasetView extends Marionette.View
 
   className : "dataset panel panel-default"
 
@@ -34,10 +34,9 @@ class SpotlightDatasetView extends Marionette.ItemView
       <div class="dataset-description col-sm-8">
         <h3><%- name %></h3>
 
-        <p><h4><%- owningTeam %></h4></p>
         <p>Scale: <%- TemplateHelpers.formatScale(dataSource.scale) %></p>
         <% if(description) { %>
-          <p><%- description %></p>
+          <p><%= description %></p>
         <% } else { %>
           <% if(hasSegmentation) { %>
             <p>Original data and segmentation</p>
@@ -49,16 +48,17 @@ class SpotlightDatasetView extends Marionette.ItemView
     </div>
   """)
 
-  templateHelpers :
+  templateContext :
     TemplateHelpers : TemplateHelpers
 
-  ui:
+  ui :
     skeletonTraceLink : "#skeletonTraceLink"
     volumeTraceLink : "#volumeTraceLink"
     form : "form"
     contentTypeInput : "#contentTypeInput"
 
-  onShow : ->
+
+  onRender : ->
 
     @$(".link-row > a").tooltip(placement : "bottom")
 

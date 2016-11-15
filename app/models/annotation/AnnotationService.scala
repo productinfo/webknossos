@@ -3,7 +3,7 @@ package models.annotation
 import java.io.{BufferedOutputStream, FileOutputStream}
 
 import com.scalableminds.util.io.ZipIO
-import models.user.User
+import models.user.{UsedAnnotationDAO, User}
 import com.scalableminds.util.reactivemongo.DBAccessContext
 import net.liftweb.common.Full
 import oxalis.security.AuthenticatedRequest
@@ -24,6 +24,7 @@ import scala.Some
 import models.binary.{DataSet, DataSetDAO}
 import oxalis.nml.NML
 import com.scalableminds.util.mvc.BoxImplicits
+import com.typesafe.scalalogging.LazyLogging
 import reactivemongo.play.json.BSONFormats._
 import models.tracing.skeleton.persistence.{SkeletonTracingInit, SkeletonTracingService}
 import play.api.i18n.{Messages, MessagesApi}
@@ -35,7 +36,7 @@ import play.api.i18n.{Messages, MessagesApi}
  * Time: 12:39
  */
 
-object AnnotationService extends AnnotationContentProviders with BoxImplicits with FoxImplicits with TextUtils{
+object AnnotationService extends AnnotationContentProviders with BoxImplicits with FoxImplicits with TextUtils {
 
   private def selectSuitableTeam(user: User, dataSet: DataSet): String = {
     val dataSetTeams = dataSet.owningTeam +: dataSet.allowedTeams
@@ -71,6 +72,14 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     } yield true
   }
 
+  def finish(annotation: Annotation)(implicit ctx: DBAccessContext) = {
+    // WARNING: needs to be repeatable, might be called multiple times for an annotation
+    AnnotationDAO.finish(annotation._id).map{ r =>
+      annotation.muta.writeAnnotationToFile()
+      UsedAnnotationDAO.removeAll(AnnotationIdentifier(annotation.typ, annotation.id))
+      r
+    }
+  }
 
   def baseFor(task: Task)(implicit ctx: DBAccessContext) =
     AnnotationDAO.findByTaskIdAndType(task._id, AnnotationType.TracingBase).one[Annotation].toFox
@@ -89,9 +98,6 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     } yield result
   }
 
-  def openExplorationalFor(user: User)(implicit ctx: DBAccessContext) =
-    AnnotationDAO.findOpenAnnotationsFor(user._id, AnnotationType.Explorational)
-
   def openTasksFor(user: User)(implicit ctx: DBAccessContext) =
     AnnotationDAO.findOpenAnnotationsFor(user._id, AnnotationType.Task)
 
@@ -101,24 +107,22 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
   def hasAnOpenTask(user: User)(implicit ctx: DBAccessContext) =
     AnnotationDAO.hasAnOpenAnnotation(user._id, AnnotationType.Task)
 
-  def findTasksOf(user: User)(implicit ctx: DBAccessContext) =
-    AnnotationDAO.findFor(user._id, AnnotationType.Task)
+  def findTasksOf(user: User, isFinished: Option[Boolean], limit: Int)(implicit ctx: DBAccessContext) =
+    AnnotationDAO.findFor(user._id, isFinished, AnnotationType.Task, limit)
 
-  def findExploratoryOf(user: User, isFinished: Option[Boolean])(implicit ctx: DBAccessContext) =
-    AnnotationDAO.findForWithTypeOtherThan(user._id, isFinished, AnnotationType.Task :: AnnotationType.SystemTracings)
+  def findExploratoryOf(user: User, isFinished: Option[Boolean], limit: Int)(implicit ctx: DBAccessContext) =
+    AnnotationDAO.findForWithTypeOtherThan(user._id, isFinished, AnnotationType.Task :: AnnotationType.SystemTracings, limit)
 
-  def findFinishedOf(user: User)(implicit ctx: DBAccessContext) =
-    AnnotationDAO.findFinishedFor(user._id)
-
-  def findTaskOf(user: User, _task: BSONObjectID)(implicit ctx: DBAccessContext) =
-    AnnotationDAO.findByTaskIdAndUser(user._id, _task, AnnotationType.Task)
+  def countTaskOf(user: User, _task: BSONObjectID)(implicit ctx: DBAccessContext) =
+    AnnotationDAO.countByTaskIdAndUser(user._id, _task, AnnotationType.Task)
 
   def createAnnotationFor(user: User, task: Task)(implicit ctx: DBAccessContext): Fox[Annotation] = {
     def useAsTemplateAndInsert(annotation: Annotation) =
       annotation.copy(
         _user = Some(user._id),
         state = AnnotationState.InProgress,
-        typ = AnnotationType.Task).temporaryDuplicate(keepId = false).flatMap(_.saveToDB)
+        typ = AnnotationType.Task,
+        created = System.currentTimeMillis).temporaryDuplicate(keepId = false).flatMap(_.saveToDB)
 
     for {
       annotationBase <- task.annotationBase ?~> "Failed to retrieve annotation base."
@@ -192,14 +196,22 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     saveToDB(annotation)
   }
 
-  def merge(readOnly: Boolean, _user: BSONObjectID, team: String, typ: AnnotationType, annotationsLike: AnnotationLike*)(implicit ctx: DBAccessContext): Fox[TemporaryAnnotation] = {
+  def merge(
+    newId: BSONObjectID,
+    readOnly: Boolean,
+    _user: BSONObjectID,
+    team: String,
+    typ: AnnotationType,
+    annotationsLike: AnnotationLike*)(implicit ctx: DBAccessContext): Fox[TemporaryAnnotation] = {
+
     val restrictions =
       if (readOnly)
         AnnotationRestrictions.readonlyAnnotation()
       else
         AnnotationRestrictions.updateableAnnotation()
 
-    CompoundAnnotation.createFromAnnotations(BSONObjectID.generate.stringify, Some(_user), team, None, annotationsLike.toList, typ, AnnotationState.InProgress, restrictions)
+    CompoundAnnotation.createFromAnnotations(
+      newId.stringify, Some(_user), team, None, annotationsLike.toList, typ, AnnotationState.InProgress, restrictions, None)
   }
 
   def saveToDB(annotation: Annotation)(implicit ctx: DBAccessContext): Fox[Annotation] = {

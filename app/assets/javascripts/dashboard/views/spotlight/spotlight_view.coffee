@@ -4,7 +4,7 @@ CreditsView              = require("./credits_view")
 SpotlightDatasetListView = require("./spotlight_dataset_list_view")
 PaginationView           = require("admin/views/pagination_view")
 
-class SpotlightView extends Marionette.LayoutView
+class SpotlightView extends Marionette.View
 
   className : "spotlight-view"
   template : _.template("""
@@ -33,14 +33,17 @@ class SpotlightView extends Marionette.LayoutView
     @creditsView = new CreditsView()
 
     @collection.fetch({ data : "isActive=true" })
-    @listenTo(@, "render", @show)
+    @listenTo(@collection, "sync", ->
+      @listenTo(@, "render", @show)
+      @show()
+    )
 
 
   show : ->
 
-    @pagination.show(@paginationView)
-    @datasets.show(@spotlightDatasetListView)
-    @credits.show(@creditsView)
+    @showChildView("pagination", @paginationView)
+    @showChildView("datasets", @spotlightDatasetListView)
+    @showChildView("credits", @creditsView)
 
 
 module.exports = SpotlightView

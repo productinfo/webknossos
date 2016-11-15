@@ -20,7 +20,7 @@ import play.api.mvc.Codec
 import play.api.libs.concurrent.Execution.Implicits._
 
 object WebSocketRESTServer {
-  def create() = {
+  def create(name: String) = {
     val (enumerator, channel) = Concurrent.broadcast[Array[Byte]]
 
     val ws = WebSocketRESTServer(channel)
@@ -30,8 +30,8 @@ object WebSocketRESTServer {
         Logger.trace("Got WS message: " + it.length)
         ws.response(it)
     }.map{ _ =>
-      Logger.debug("Websocket closed.")
-                   }
+      Logger.info(s"Websocket to '$name' closed. ")
+    }
     (iteratee, enumerator, ws)
   }
 }
@@ -72,8 +72,10 @@ case class WebSocketRESTServer(out: Channel[Array[Byte]]) extends FoxImplicits{
       val json = Json.parse(rawJson)
       json.validate[RESTResponse] match {
         case JsSuccess(response, _) =>
-          if(response.status != Status.OK.toString)
-            Logger.warn(s"Failed (Code: ${response.status})  REST call to '${response.path}'(${response.uuid}). Result: '${response.body.toString().take(500)}'")
+          if(response.status != Status.OK.toString) {
+            val log: (=> String) => Unit = if(response.status != Status.NOT_FOUND.toString) Logger.warn else Logger.debug
+            log(s"Failed (Code: ${response.status})  REST call to '${response.path}'(${response.uuid}). Result: '${response.body.toString().take(500)}'")
+          }
           openCalls().get(response.uuid).foreach {
             promise =>
               promise.trySuccess(Full(response)) match {

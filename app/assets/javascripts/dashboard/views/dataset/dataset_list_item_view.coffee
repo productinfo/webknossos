@@ -68,6 +68,11 @@ class DatasetListItemView extends Marionette.CompositeView
         <% } %>
         <% if(isActive){ %>
           <div class="dataset-actions">
+            <% if(isEditable) { %>
+              <a href="/datasets/<%- name %>/edit" title="Edit dataset">
+                <i class="fa fa-pencil"></i> edit
+              </a>
+            <% } %>
             <a href="/datasets/<%- name %>/view" title="View dataset">
               <img src="/assets/images/eye.svg"> view
             </a>
@@ -101,7 +106,7 @@ class DatasetListItemView extends Marionette.CompositeView
   childView : DatasetAccessView
   childViewContainer : "tbody"
 
-  templateHelpers :
+  templateContext :
     TemplateHelpers : TemplateHelpers
 
   events :
@@ -170,7 +175,7 @@ class DatasetListItemView extends Marionette.CompositeView
 
   importFailed : (response) ->
 
-    if @isRendered and not @isDestroyed
+    if @isRendered() and not @isDestroyed()
       @ui.importLink.show()
       @ui.progressbarContainer.addClass("hide")
       @ui.row.addClass('import-failed')

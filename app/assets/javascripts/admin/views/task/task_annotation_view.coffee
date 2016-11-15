@@ -5,14 +5,14 @@ Request         = require("libs/request")
 Marionette      = require("backbone.marionette")
 AnnotationModel = require("admin/models/task/annotation_model")
 
-class TaskAnnotationView extends Marionette.ItemView
+class TaskAnnotationView extends Marionette.View
 
   tagName : "tr"
   attributes : ->
     id : @model.get("id")
 
   template : _.template("""
-    <td><%- user %></td>
+    <td><%- user.firstName %> <%- user.lastName %> (<%- user.email %>)</td>
     <td><%- moment(created).format("YYYY-MM-DD HH:SS") %></td>
     <td><i class="fa fa-check-circle-o"></i><%- stateLabel %></td>
     <td class="nowrap">
@@ -28,19 +28,19 @@ class TaskAnnotationView extends Marionette.ItemView
         </li>
         <% }) %>
         <li>
-          <a href="#" class="delete-annotation"><i class="fa fa-trash-o"></i>delete</a>
+          <a href="#" class="cancel-annotation"><i class="fa fa-trash-o"></i>cancel</a>
         </li>
         </ul>
       </div>
     </td>
   """)
 
-  templateHelpers :
+  templateContext :
     moment : moment
 
   events :
     "click .isAjax" : "callAjax"
-    "click .delete-annotation" : "deleteAnnotation"
+    "click .cancel-annotation" : "cancelAnnotation"
 
   modelEvents :
     "change" : "render"
@@ -58,9 +58,9 @@ class TaskAnnotationView extends Marionette.ItemView
     )
 
 
-  deleteAnnotation : ->
+  cancelAnnotation : ->
 
-    if window.confirm("Do you really want to delete this annotation?")
+    if window.confirm("Do you really want to cancel this annotation?")
       @model.destroy()
 
 module.exports = TaskAnnotationView

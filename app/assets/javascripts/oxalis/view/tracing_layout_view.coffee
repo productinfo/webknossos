@@ -17,7 +17,7 @@ BackboneToOxalisAdapterModel = require("oxalis/model/settings/backbone_to_oxalis
 Modal                        = require("oxalis/view/modal")
 Utils                        = require("libs/utils")
 
-class TracingLayoutView extends Marionette.LayoutView
+class TracingLayoutView extends Marionette.View
 
   MARGIN : 40
 
@@ -114,12 +114,12 @@ class TracingLayoutView extends Marionette.LayoutView
     actionBarView = new ActionBarView(@options)
     tracingView = new TracingView(@options)
 
-    @tracingContainer.show(tracingView, preventDestroy : true)
+    @showChildView("tracingContainer", tracingView, preventDestroy : true)
+
+    @showChildView("actionBar", actionBarView, preventDestroy : true)
 
     if not @model.settings.advancedOptionsAllowed
       return
-
-    @actionBar.show(actionBarView, preventDestroy : true)
 
     if @isSkeletonMode()
       @rightMenuView = new SkeletonTracingRightMenuView(@options)
@@ -128,7 +128,7 @@ class TracingLayoutView extends Marionette.LayoutView
     else
       @rightMenuView = new ViewmodeRightMenuView(@options)
 
-    @rightMenu.show(@rightMenuView)
+    @showChildView("rightMenu", @rightMenuView)
     @renderSettings()
     @maybeShowNewTaskTypeModal()
 
@@ -137,7 +137,7 @@ class TracingLayoutView extends Marionette.LayoutView
 
     event.preventDefault()
     modalView = new UserScriptsModalView()
-    @modalWrapper.show(modalView)
+    @showChildView("modalWrapper", modalView)
     modalView.show()
 
 
@@ -170,7 +170,7 @@ class TracingLayoutView extends Marionette.LayoutView
     else
       settingsTabView = new ViewmodeTabView(@options)
 
-    @settings.show(settingsTabView)
+    @showChildView("settings", settingsTabView)
 
 
   isTracingMode : ->

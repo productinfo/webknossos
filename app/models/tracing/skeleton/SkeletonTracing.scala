@@ -147,7 +147,7 @@ case class SkeletonTracing(
   def maxNodeId =
     oxalis.nml.utils.maxNodeId(trees)
 
-  def mergeWith(annotationContent: AnnotationContent)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
+  def mergeWith(annotationContent: AnnotationContent, settings: Option[AnnotationSettings])(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
     def mergeBoundingBoxes(aOpt: Option[BoundingBox], bOpt: Option[BoundingBox]) =
       for {
         a <- aOpt
@@ -160,7 +160,7 @@ case class SkeletonTracing(
         val nodeMapping = calculateNodeMapping(sourceTrees, trees)
         val mergedTrees = mergeTrees(sourceTrees, trees, nodeMapping)
         val mergedBoundingBox = mergeBoundingBoxes(boundingBox, s.boundingBox)
-        val result = this.copy(trees = mergedTrees, boundingBox = mergedBoundingBox)
+        val result = this.copy(trees = mergedTrees, boundingBox = mergedBoundingBox, settings = settings.getOrElse(this.settings))
         Fox.successful(result)
       case s                  =>
         Fox.failure("Can't merge annotation content of a different type into TemporarySkeletonTracing. Tried to merge " + s.id)
@@ -233,7 +233,7 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
     nml: NML,
     id: String,
     boundingBox: Option[BoundingBox],
-    settings: AnnotationSettings = AnnotationSettings.default)(implicit ctx: DBAccessContext) = {
+    settings: Option[AnnotationSettings] = None)(implicit ctx: DBAccessContext) = {
 
     val box = boundingBox.flatMap { box => if (box.isEmpty) None else Some(box) }
     val start = nml.editPosition.toFox.orElse(defaultDataSetPosition(nml.dataSetName))
@@ -247,7 +247,7 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
         Vector3D(0,0,0),
         SkeletonTracing.defaultZoomLevel,
         box,
-        settings,
+        settings.getOrElse(AnnotationSettings.default),
         isArchived = false,
         nml.trees,
         id)
@@ -258,7 +258,7 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
     tracing.copy(id = id)
   }
 
-  def createFrom(nmls: List[NML], boundingBox: Option[BoundingBox], settings: AnnotationSettings)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
+  def createFrom(nmls: List[NML], boundingBox: Option[BoundingBox], settings: Option[AnnotationSettings])(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
     nmls match {
       case head :: tail =>
         val startTracing = createFrom(head, head.timestamp.toString, boundingBox, settings)
@@ -268,7 +268,7 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
             for {
               t <- f
               n <- createFrom(s, s.timestamp.toString, boundingBox)
-              r <- t.mergeWith(n)
+              r <- t.mergeWith(n, settings)
             } yield {
               r
             }

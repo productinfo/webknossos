@@ -11,9 +11,11 @@ ScaleInfo            = require("./model/scaleinfo")
 Flycam2d             = require("./model/flycam2d")
 Flycam3d             = require("./model/flycam3d")
 constants            = require("./constants")
-Request              = require("libs/request")
-Toast                = require("libs/toast")
-ErrorHandling        = require("libs/error_handling")
+Request              = require("../libs/request")
+Toast                = require("../libs/toast")
+ErrorHandling        = require("../libs/error_handling")
+WkLayer              = require("./model/binary/layers/wk_layer")
+NdStoreLayer         = require("./model/binary/layers/nd_store_layer")
 
 # This is THE model. It takes care of the data including the
 # communication with the server.
@@ -23,6 +25,9 @@ ErrorHandling        = require("libs/error_handling")
 
 
 class Model extends Backbone.Model
+
+
+  HANDLED_ERROR : {}
 
 
   constructor : ->
@@ -41,52 +46,45 @@ class Model extends Backbone.Model
 
     Request.receiveJSON(infoUrl).then( (tracing) =>
 
-
       if tracing.error
-        Toast.error(tracing.error)
-        return {"error" : true}
+        error = tracing.error
 
       else unless tracing.content.dataSet
-        Toast.error("Selected dataset doesn't exist")
-        return {"error" : true}
+        error = "Selected dataset doesn't exist"
 
       else unless tracing.content.dataSet.dataLayers
         if datasetName = tracing.content.dataSet.name
-          Toast.error("Please, double check if you have the dataset '#{datasetName}' imported.")
+          error = "Please, double check if you have the dataset '#{datasetName}' imported."
         else
-          Toast.error("Please, make sure you have a dataset imported.")
-        return {"error" : true}
+          error = "Please, make sure you have a dataset imported."
 
-      else
+      if error
+        Toast.error(error)
+        throw @HANDLED_ERROR
 
-        @user = new User()
-        @set("user", @user)
-        @set("datasetName", tracing.content.dataSet.name)
+      @user = new User()
+      @set("user", @user)
+      @set("datasetName", tracing.content.dataSet.name)
 
-        @user.fetch().then( =>
+      return @user.fetch().then(-> Promise.resolve(tracing))
 
-          @set("dataset", new Backbone.Model(tracing.content.dataSet))
-          colorLayers = _.filter( @get("dataset").get("dataLayers"),
-                                  (layer) -> layer.category == "color")
-          @set("datasetConfiguration", new DatasetConfiguration({
-            datasetName : @get("datasetName")
-            dataLayerNames : _.map(colorLayers, "name")
-          }))
-          @get("datasetConfiguration").fetch().then(
-            =>
-              layers = @getLayers(tracing.content.contentData.customLayers)
+    ).then( (tracing) =>
 
-              Promise.all(
-                @getDataTokens(layers)
-              ).then( =>
-                error = @initializeWithData(tracing, layers)
-                return error if error
-              )
+      @set("dataset", new Backbone.Model(tracing.content.dataSet))
+      colorLayers = _.filter( @get("dataset").get("dataLayers"),
+                              (layer) -> layer.category == "color")
+      @set("datasetConfiguration", new DatasetConfiguration({
+        datasetName : @get("datasetName")
+        dataLayerNames : _.map(colorLayers, "name")
+      }))
+      return @get("datasetConfiguration").fetch().then(-> Promise.resolve(tracing))
 
-            -> Toast.error("Ooops. We couldn't communicate with our mother ship. Please try to reload this page.")
-            )
-        )
-      )
+    ).then( (tracing) =>
+
+      layerInfos = @getLayerInfos(tracing.content.contentData.customLayers)
+      @initializeWithData(tracing, layerInfos)
+
+    )
 
 
   determineAllowedModes : ->
@@ -112,14 +110,23 @@ class Model extends Backbone.Model
     return allowedModes
 
 
-  initializeWithData : (tracing, layers) ->
+  initializeWithData : (tracing, layerInfos) ->
 
+    dataStore = tracing.content.dataSet.dataStore
     dataset = @get("dataset")
 
-    ErrorHandling.assertExtendContext({
-      task: @get("tracingId")
-      dataSet: dataset.get("name")
+    LayerClass = switch dataStore.typ
+      when "webknossos-store" then WkLayer
+      when "ndstore" then NdStoreLayer
+      else throw new Error("Unknown datastore type: #{dataStore.typ}")
 
+    layers = layerInfos.map((layerInfo) ->
+      new LayerClass(layerInfo, dataset.get("name"), dataStore)
+    )
+
+    ErrorHandling.assertExtendContext({
+      task : @get("tracingId")
+      dataSet : dataset.get("name")
     })
 
     console.log "tracing", tracing
@@ -129,14 +136,7 @@ class Model extends Backbone.Model
     app.scaleInfo = new ScaleInfo(dataset.get("scale"))
 
     if (bb = tracing.content.boundingBox)?
-        @boundingBox = {
-          min : bb.topLeft
-          max : [
-            bb.topLeft[0] + bb.width
-            bb.topLeft[1] + bb.height
-            bb.topLeft[2] + bb.depth
-          ]
-        }
+      @taskBoundingBox = @computeBoundingBoxFromArray(bb.topLeft.concat([bb.width, bb.height, bb.depth]))
 
     @connectionInfo = new ConnectionInfo()
     @binary = {}
@@ -144,23 +144,22 @@ class Model extends Backbone.Model
     maxZoomStep = -Infinity
 
     for layer in layers
-      layer.bitDepth = parseInt(layer.elementClass.substring(4))
       maxLayerZoomStep = Math.log(Math.max(layer.resolutions...)) / Math.LN2
       @binary[layer.name] = new Binary(this, tracing, layer, maxLayerZoomStep, @connectionInfo)
       maxZoomStep = Math.max(maxZoomStep, maxLayerZoomStep)
 
-    @buildMappingsObject(layers)
+    @buildMappingsObject()
 
     if @getColorBinaries().length == 0
       Toast.error("No data available! Something seems to be wrong with the dataset.")
-      return {"error" : true}
+      throw @HANDLED_ERROR
 
     flycam = new Flycam2d(constants.PLANE_WIDTH, maxZoomStep + 1, @)
     flycam3d = new Flycam3d(constants.DISTANCE_3D, dataset.get("scale"))
     @set("flycam", flycam)
     @set("flycam3d", flycam3d)
-    @listenTo(flycam3d, "changed", (matrix, zoomStep) => flycam.setPosition(matrix[12..14]))
-    @listenTo(flycam, "positionChanged" : (position) => flycam3d.setPositionSilent(position))
+    @listenTo(flycam3d, "changed", (matrix, zoomStep) -> flycam.setPosition(matrix[12..14]))
+    @listenTo(flycam, "positionChanged" : (position) -> flycam3d.setPositionSilent(position))
 
     if @get("controlMode") == constants.CONTROL_MODE_TRACE
 
@@ -168,8 +167,10 @@ class Model extends Backbone.Model
         ErrorHandling.assert( @getSegmentationBinary()?,
           "Volume is allowed, but segmentation does not exist" )
         @set("volumeTracing", new VolumeTracing(tracing, flycam, flycam3d, @getSegmentationBinary()))
+        @annotationModel = @get("volumeTracing")
       else
         @set("skeletonTracing", new SkeletonTracing(tracing, flycam, flycam3d, @user))
+        @annotationModel = @get("skeletonTracing")
 
     @applyState(@get("state"), tracing)
     @computeBoundaries()
@@ -203,29 +204,33 @@ class Model extends Backbone.Model
     @trigger("change:mode", mode)
 
 
+  setUserBoundingBox : (bb) ->
+
+    @userBoundingBox = @computeBoundingBoxFromArray(bb)
+    @trigger("change:userBoundingBox", @userBoundingBox)
+
+
+  computeBoundingBoxFromArray : (bb) ->
+
+    [x, y, z, width, height, depth] = bb
+
+    return {
+      min : [x, y, z]
+      max : [x + width, y + height, z + depth]
+    }
+
+
   # For now, since we have no UI for this
-  buildMappingsObject : (layers) ->
+  buildMappingsObject : ->
 
     segmentationBinary = @getSegmentationBinary()
 
     if segmentationBinary?
       window.mappings = {
-        getAll : => segmentationBinary.mappings.getMappingNames()
-        getActive : => segmentationBinary.activeMapping
-        activate : (mapping) => segmentationBinary.setActiveMapping(mapping)
+        getAll : -> segmentationBinary.mappings.getMappingNames()
+        getActive : -> segmentationBinary.activeMapping
+        activate : (mapping) -> segmentationBinary.setActiveMapping(mapping)
       }
-
-
-  getDataTokens : (layers) ->
-
-    dataStoreUrl = @get("dataset").get("dataStore").url
-
-    for layer in layers
-      do (layer) =>
-        Request.receiveJSON("/dataToken/generate?dataSetName=#{@get("datasetName")}&dataLayerName=#{layer.name}").then( (dataStore) ->
-          layer.token = dataStore.token
-          layer.url   = dataStoreUrl
-        )
 
 
   getColorBinaries : ->
@@ -242,7 +247,7 @@ class Model extends Backbone.Model
     )
 
 
-  getLayers : (userLayers) ->
+  getLayerInfos : (userLayers) ->
     # Overwrite or extend layers with userLayers
 
     layers = @get("dataset").get("dataLayers")

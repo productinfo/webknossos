@@ -36,6 +36,7 @@ class DashboardTaskListView extends Marionette.CompositeView
           <th data-sort="projectName">Project </th>
           <th data-sort="type.description">Description </th>
           <th>Modes </th>
+          <th data-sort="created">Created</th>
           <th></th>
         </tr>
       </thead>
@@ -50,7 +51,7 @@ class DashboardTaskListView extends Marionette.CompositeView
     isAdminView : @options.isAdminView
 
 
-  templateHelpers : ->
+  templateContext : ->
     isAdminView : @options.isAdminView
     getFinishVerb : =>
       return if @showFinishedTasks then "unfinished" else "finished"
@@ -72,7 +73,7 @@ class DashboardTaskListView extends Marionette.CompositeView
   initialize : (@options) ->
 
     @showFinishedTasks = false
-    @collection = new UserTasksCollection()
+    @collection = new UserTasksCollection([], userID : @options.userID)
     @collection.fetch()
 
     @listenTo(app.vent, "modal:destroy", @refresh)
@@ -95,7 +96,8 @@ class DashboardTaskListView extends Marionette.CompositeView
   toggleFinished : ->
 
     @showFinishedTasks = not @showFinishedTasks
-    @render()
+    @collection.isFinished = @showFinishedTasks
+    @refresh()
 
 
   transferTask : (evt) ->

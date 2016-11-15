@@ -25,19 +25,16 @@ class TaskCollection extends Backbone.Collection
       # apply some defaults
       response.type =
         summary : response.type?.summary || "<deleted>"
-        id: response.type?.id || ""
+        id : response.type?.id || ""
 
-      response.formattedTracingTime = FormatUtils.formatSeconds(response.tracingTime? or 0)
+      response.tracingTime ?= 0
+      response.formattedTracingTime = FormatUtils.formatSeconds(response.tracingTime / 1000)
 
       # convert bounding box
       if response.boundingBox?
 
         { topLeft, width, height, depth } = response.boundingBox
-        response.boundingBox = topLeft.concat [
-          topLeft[0] + width
-          topLeft[1] + height
-          topLeft[2] + depth
-        ]
+        response.boundingBox = topLeft.concat([width, height, depth])
 
       else
         response.boundingBox = []

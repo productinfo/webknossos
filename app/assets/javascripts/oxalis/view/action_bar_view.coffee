@@ -7,13 +7,13 @@ VolumeActionsView   = require("./action-bar/volume_actions_view")
 SkeletonActionsView = require("./action-bar/skeleton_actions_view")
 Constants           = require("../constants")
 
-class ActionBarView extends Marionette.LayoutView
+class ActionBarView extends Marionette.View
 
   className : "container-fluid"
 
   template : _.template("""
 
-    <% if (isTraceMode) { %>
+    <% if (isTraceMode && hasAdvancedOptions) { %>
       <a href="#" id="menu-toggle-button" class="btn btn-default"
         data-toggle="offcanvas"
         data-target="#settings-menu-wrapper"
@@ -27,22 +27,25 @@ class ActionBarView extends Marionette.LayoutView
       <div id="dataset-actions"></div>
     <% } %>
 
-    <div id="dataset-position"></div>
+    <% if (hasAdvancedOptions) { %>
+      <div id="dataset-position"></div>
+    <% } %>
 
-    <% if (isVolumeMode) { %>
+    <% if (isVolumeMode && hasAdvancedOptions) { %>
       <div id="volume-actions"></div>
     <% } %>
 
-    <% if (isTraceMode) { %>
+    <% if (isTraceMode && hasAdvancedOptions) { %>
       <div id="view-modes"></div>
       <div id="skeleton-actions"></div>
     <% } %>
   """)
 
-  templateHelpers : ->
+  templateContext : ->
 
     isTraceMode : @isTraceMode()
     isVolumeMode : @isVolumeMode()
+    hasAdvancedOptions : @hasAdvancedOptions()
 
 
   regions :
@@ -72,16 +75,18 @@ class ActionBarView extends Marionette.LayoutView
 
   afterRender : ->
 
-    @datasetPosition.show(@datasetPositionView)
+    if @hasAdvancedOptions()
+      @showChildView("datasetPosition", @datasetPositionView)
 
     if @isTraceMode()
-      @datasetActionButtons.show(@datasetActionsView)
+      @showChildView("datasetActionButtons", @datasetActionsView)
 
-      if @isVolumeMode()
-        @volumeActions.show(@volumeActionsView)
-      else
-        @viewModes.show(@viewModesView)
-        @skeletonActions.show(@skeletonActionsView)
+      if @hasAdvancedOptions()
+        if @isVolumeMode()
+          @showChildView("volumeActions", @volumeActionsView)
+        else
+          @showChildView("viewModes", @viewModesView)
+          @showChildView("skeletonActions", @skeletonActionsView)
 
 
   isTraceMode : ->
@@ -92,6 +97,11 @@ class ActionBarView extends Marionette.LayoutView
   isVolumeMode : ->
 
     return @model.get("mode") == Constants.MODE_VOLUME
+
+
+  hasAdvancedOptions : ->
+
+    return @model.settings.advancedOptionsAllowed
 
 
 module.exports = ActionBarView

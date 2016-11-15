@@ -1,6 +1,7 @@
 import akka.actor.{PoisonPill, Props}
 import akka.routing.RoundRobinPool
 import akka.actor.{ActorSystem, Props}
+import com.newrelic.api.agent.NewRelic
 import com.scalableminds.util.reactivemongo.GlobalDBAccess
 import com.scalableminds.util.security.SCrypt
 import models.binary.{DataStore, DataStoreDAO, WebKnossosStore}
@@ -11,14 +12,15 @@ import play.api._
 import play.api.libs.concurrent._
 import models.user._
 import models.task._
-import oxalis.annotation.AnnotationStore
 import com.scalableminds.util.mail.Mailer
 import play.api.libs.concurrent.Execution.Implicits._
 import com.typesafe.config.{Config, ConfigFactory}
 import models.tracing.skeleton.persistence.SkeletonTracingService
-import play.airbrake.Airbrake
+import com.typesafe.config.Config
+import oxalis.mturk.MTurkNotificationReceiver
 import play.api.libs.json.Json
 import play.api.mvc._
+import scala.concurrent.duration._
 
 object Global extends GlobalSettings {
   var clusters: List[ActorSystem] = Nil
@@ -36,13 +38,13 @@ object Global extends GlobalSettings {
   }
 
   def startActors(conf: Config, app: Application) {
-    Akka.system(app).actorOf(
-      RoundRobinPool(10).props(Props[AnnotationStore]),
-      name = "annotationStore")
 
     Akka.system(app).actorOf(
       Props(new Mailer(conf)),
       name = "mailActor")
+
+    // We need to delay the start of the notification handle, since the database needs to be available first
+    MTurkNotificationReceiver.startDelayed(app, 2.seconds)
 
     if (conf.getBoolean("workload.active")) {
       Akka.system(app).actorOf(
@@ -65,7 +67,7 @@ object Global extends GlobalSettings {
   }
 
   override def onError(request: RequestHeader, ex: Throwable) = {
-    Airbrake.notify(request, ex)
+    NewRelic.noticeError(ex)
     super.onError(request, ex)
   }
 

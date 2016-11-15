@@ -6,7 +6,7 @@ LoggedTimeView             = require("./logged_time_view")
 DatasetSwitchView          = require("./dataset/dataset_switch_view")
 
 
-class DashboardView extends Marionette.LayoutView
+class DashboardView extends Marionette.View
 
   className : "container wide"
   id : "dashboard"
@@ -18,24 +18,24 @@ class DashboardView extends Marionette.LayoutView
       <ul class="nav nav-tabs">
         <% if (!isAdminView) { %>
           <li class="active">
-            <a href="#" id="tab-datasets" data-toggle="tab">Datasets</a>
+            <a href="#" id="tab-datasets" data-target="#placeholder" data-toggle="tab">Datasets</a>
           </li>
         <% } %>
         <li <% if (isAdminView) { %> class="active" <% } %> >
-          <a href="#" id="tab-tasks" data-toggle="tab">Tasks</a>
+          <a href="#" id="tab-tasks" data-target="#placeholder" data-toggle="tab">Tasks</a>
         <li <% if (isAdminView) { %> class="active" <% } %> >
         </li>
         <li>
-          <a href="#" id="tab-explorative" data-toggle="tab">Explorative Annotations</a>
+          <a href="#" id="tab-explorative" data-target="#placeholder" data-toggle="tab">Explorative Annotations</a>
         </li>
         <% if (isAdminView) { %>
           <li>
-            <a href="#" id="tab-logged-time" data-toggle="tab">Tracked Time</a>
+            <a href="#" id="tab-logged-time" data-target="#placeholder" data-toggle="tab">Tracked Time</a>
           </li>
         <% } %>
       </ul>
       <div class="tab-content">
-        <div class="tab-pane active"></div>
+        <div class="tab-pane active" id="placeholder"></div>
       </div>
     </div>
   """)
@@ -51,7 +51,7 @@ class DashboardView extends Marionette.LayoutView
     "click #tab-logged-time" : "showLoggedTime"
 
 
-  templateHelpers : ->
+  templateContext : ->
     isAdminView : @options.isAdminView
 
 
@@ -93,7 +93,7 @@ class DashboardView extends Marionette.LayoutView
 
     unless view = @viewCache[viewName]
       view = @viewCache[viewName] = new viewClass(@options)
-    @tabPane.show(view, preventDestroy : true)
+    @showChildView("tabPane", view, preventDestroy : true)
 
 
 module.exports = DashboardView

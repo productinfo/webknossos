@@ -12,7 +12,7 @@ require('brace/mode/javascript');
 require('brace/mode/json');
 require('brace/theme/clouds');
 
-class TaskQueryView extends Marionette.LayoutView
+class TaskQueryView extends Marionette.View
 
   template : _.template("""
     <div class="container wide">
@@ -27,9 +27,14 @@ class TaskQueryView extends Marionette.LayoutView
             <a class="btn btn-primary search-button" href="#">
               <i class="fa fa-search"></i>Search
             </a>
-            <a class="btn btn-default documentation-button" href="#">
-              <i class="fa fa-question-circle"></i>Documentation
-            </a>
+            <div class="btn-group btn-group.btn-group-justified" role="group">
+              <a class="btn btn-default documentation-button" role="button" href="#">
+                <i class="fa fa-question-circle"></i>Documentation
+              </a>
+              <a class="btn btn-default" role="button" href="/help/faq#taskqueries">
+                 <i class="fa fa-info"></i>Examples
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -41,8 +46,8 @@ class TaskQueryView extends Marionette.LayoutView
   """)
 
   regions :
-    "paginatorRegion" : ".paginator"
-    "taskListRegion" : ".taskList"
+    "paginator" : ".paginator"
+    "taskList" : ".taskList"
 
   ui :
     "taskList" : ".taskList"
@@ -63,8 +68,8 @@ class TaskQueryView extends Marionette.LayoutView
 
     paginationView = new admin.PaginationView({collection : paginatedCollection, addButtonText : "Create New Task"})
 
-    @taskListRegion.show(@taskListView)
-    @paginatorRegion.show(paginationView)
+    @showChildView("taskList", @taskListView)
+    @showChildView("paginator", paginationView)
 
     @documentationModal = new TaskQueryDocumentationModal()
     @documentationModal.render()
@@ -73,8 +78,7 @@ class TaskQueryView extends Marionette.LayoutView
     @editor = ace.edit(@ui.query[0])
     @editor.getSession().setMode('ace/mode/javascript')
     @editor.setTheme('ace/theme/clouds')
-
-    defaultQuery = "{\n\t\"isActive\": true\n}"
+    defaultQuery = "{\n\t\"_id\": {\"$oid\": \"56cb594a16000045b4d0f273\"}\n}"
     @editor.setValue(defaultQuery)
     @editor.clearSelection()
     @editor.resize()
@@ -105,7 +109,7 @@ class TaskQueryView extends Marionette.LayoutView
       @collection.reset()
       defaultQueryLimit = 100
       if result.length == defaultQueryLimit
-        Toast.warning("Not all results are shown because there are too many. Results are limited to #{defaultQueryLimit} entries.")
+        Toast.warning("Not all results are shown because there are more than #{defaultQueryLimit}. Try to narrow your query.")
       @collection.addObjects(result)
     )
 

@@ -22,6 +22,9 @@ object DataSetService extends FoxImplicits {
   def updateTeams(dataSet: DataSet, teams: List[String])(implicit ctx: DBAccessContext) =
     DataSetDAO.updateTeams(dataSet.name, teams)
 
+  def update(dataSet: DataSet, description: Option[String], isPublic: Boolean)(implicit ctx: DBAccessContext) =
+    DataSetDAO.update(dataSet.name, description, isPublic)
+
   def isProperDataSetName(name: String) = name.matches("[A-Za-z0-9_\\-]*")
 
   def createDataSet(
@@ -80,7 +83,8 @@ object DataSetService extends FoxImplicits {
     DataSetDAO.findOneBySourceName(name).flatMap(_.dataSource)
 
   def updateDataSources(dataStore: DataStore, dataSources: List[DataSourceLike])(implicit ctx: DBAccessContext) = {
-    Logger.info(s"[${dataStore.name}] Available datasets: " + dataSources.map(_.id).mkString(", "))
+    Logger.info(s"[${dataStore.name}] Available datasets: ${dataSources.count(_.isUsable)} (usable), ${dataSources.count(!_.isUsable)} (unusable)")
+    Logger.debug(s"Found datasets: "+ dataSources.map(_.id).mkString(", "))
     dataSources.map { dataSource =>
       DataSetService.updateDataSource(DataStoreInfo(dataStore.name, dataSource.serverUrl, dataStore.typ, None), dataSource)
     }

@@ -12,6 +12,7 @@ constants          = require("../../constants")
 {M4x4, V3}         = require("libs/mjs")
 Utils              = require("libs/utils")
 
+Toast              = require("libs/toast")
 
 class ArbitraryController
 
@@ -20,6 +21,7 @@ class ArbitraryController
   # Arbitrary Controller: Responsible for Arbitrary Modes
 
   WIDTH : 128
+  TIMETOCENTER : 200
 
   plane : null
   crosshair : null
@@ -37,12 +39,12 @@ class ArbitraryController
     keyboardNoLoop : null
     keyboardOnce : null
 
-    unbind : ->
+    destroy : ->
 
-      @mouse?.unbind()
-      @keyboard?.unbind()
-      @keyboardNoLoop?.unbind()
-      @keyboardOnce?.unbind()
+      @mouse?.destroy()
+      @keyboard?.destroy()
+      @keyboardNoLoop?.destroy()
+      @keyboardOnce?.destroy()
 
 
   constructor : (@model, @view, @sceneController, @skeletonTracingController) ->
@@ -86,7 +88,7 @@ class ArbitraryController
 
     matrix = @cam.getMatrix()
     for binary in @model.getColorBinaries()
-      binary.arbitraryPing(matrix)
+      binary.arbitraryPing(matrix, @model.datasetConfiguration.get("quality"))
 
 
   initMouse : ->
@@ -169,8 +171,6 @@ class ArbitraryController
       "b" : => @pushBranch()
       "j" : => @popBranch()
 
-      #Reset Matrix
-      "r" : => @cam.setRotation([0, 0, 0])
 
       #Recenter active node
       "y" : => @centerActiveNode()
@@ -180,6 +180,8 @@ class ArbitraryController
         @setRecord(true)
       "u" : =>
         @setRecord(false)
+      #Rotate view by 180 deg
+      "r" : => @cam.yaw(Math.PI)
     )
 
     @input.keyboardOnce = new Input.Keyboard(
@@ -242,7 +244,7 @@ class ArbitraryController
   stop : ->
 
     if @isStarted
-      @input.unbind()
+      @input.destroy()
 
     @arbitraryView.stop()
 
@@ -301,12 +303,17 @@ class ArbitraryController
   pushBranch : ->
 
     @model.skeletonTracing.pushBranch()
+    Toast.success("Branchpoint set")
 
 
   popBranch : ->
 
     _.defer => @model.skeletonTracing.popBranch().then((id) =>
       @setActiveNode(id, true)
+      if id == 1
+        @cam.yaw(Math.PI)
+        Toast.warning("Reached initial node, view reversed")
+        @model.commentTabView.appendComment("reversed")
     )
 
 
@@ -325,7 +332,7 @@ class ArbitraryController
       waypointAnimation = new TWEEN.Tween(
         {x: curPos[0], y: curPos[1], z: curPos[2], rx: curRotation[0], ry: curRotation[1], rz: curRotation[2], cam: @cam})
       waypointAnimation.to(
-        {x: newPos[0], y: newPos[1], z: newPos[2], rx: newRotation[0], ry: newRotation[1], rz: newRotation[2]}, 200)
+        {x: newPos[0], y: newPos[1], z: newPos[2], rx: newRotation[0], ry: newRotation[1], rz: newRotation[2]}, @TIMETOCENTER)
       waypointAnimation.onUpdate( ->
         @cam.setPosition([@x, @y, @z])
         @cam.setRotation([@rx, @ry, @rz])
