@@ -6,17 +6,14 @@ import com.scalableminds.util.reactivemongo.{DBAccessContext, GlobalDBAccess}
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import com.scalableminds.util.xml.{XMLWrites, Xml}
 import models.annotation.{AnnotationContent, AnnotationSettings}
-import models.binary.DataSetDAO
-import models.tracing.CommonTracing
+import models.binary.DataSetService
 import models.tracing.skeleton.persistence.SkeletonTracingService
-import net.liftweb.common.Full
 import org.apache.commons.io.IOUtils
 import oxalis.nml._
 import oxalis.nml.utils._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Enumerator
 import play.api.libs.json._
-import reactivemongo.play.json.BSONFormats._
 import reactivemongo.bson.BSONObjectID
 
 case class SkeletonTracing(
@@ -32,7 +29,7 @@ case class SkeletonTracing(
   trees: List[Tree],
   id: String = BSONObjectID.generate.stringify
 )
-  extends AnnotationContent with CommonTracing with TreeMergeHelpers {
+  extends AnnotationContent with TreeMergeHelpers {
 
   type Self = SkeletonTracing
 
@@ -64,7 +61,7 @@ case class SkeletonTracing(
     trees.find(t => t.id == treeId)
 
   def maxTreeId = {
-    if(trees.nonEmpty)
+    if (trees.nonEmpty)
       Some(trees.maxBy(_.id).id)
     else
       None
@@ -79,7 +76,7 @@ case class SkeletonTracing(
           val (splittedOriginal, splittedTarget) = tree.moveTreeComponent(nodeIds, Tree(nextTreeId))
           val updated = t.withUpdatedTree(tree.id, splittedOriginal).withNewTree(splittedTarget)
           splitStep(updated, mergeMapping + (splittedTarget.id -> tree.id))
-        case _ =>
+        case _          =>
           (t, mergeMapping)
       }
     }
@@ -217,7 +214,7 @@ case class SkeletonTracing(
 
   def downloadFileExtension = ".nml"
 
-  def toDownloadStream(implicit ctx: DBAccessContext): Fox[Enumerator[Array[Byte]]] =
+  def toDownloadStream(name: String)(implicit ctx: DBAccessContext): Fox[Enumerator[Array[Byte]]] =
     NMLService.toNML(this).map(data => Enumerator.fromStream(IOUtils.toInputStream(data)))
 
   override def contentData =
@@ -262,15 +259,6 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
 
   val defaultZoomLevel = 2.0
 
-  private def defaultDataSetPosition(dataSetName: String)(implicit ctx: DBAccessContext) = {
-    DataSetDAO.findOneBySourceName(dataSetName).futureBox.map {
-      case Full(dataSet) =>
-        dataSet.defaultStart
-      case _ =>
-        Point3D(0, 0, 0)
-    }
-  }
-
   def createFrom(
     nml: NML,
     id: String,
@@ -278,7 +266,7 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
     settings: Option[AnnotationSettings] = None)(implicit ctx: DBAccessContext) = {
 
     val box = boundingBox.flatMap { box => if (box.isEmpty) None else Some(box) }
-    val start = nml.editPosition.toFox.orElse(defaultDataSetPosition(nml.dataSetName))
+    val start = nml.editPosition.toFox.orElse(DataSetService.defaultDataSetPosition(nml.dataSetName))
 
     start.map {
       SkeletonTracing(
@@ -286,8 +274,8 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
         System.currentTimeMillis(),
         nml.activeNodeId,
         _,
-        Vector3D(0,0,0),
-        SkeletonTracing.defaultZoomLevel,
+        nml.editRotation.getOrElse(Vector3D(0, 0, 0)),
+        nml.zoomLevel.getOrElse(SkeletonTracing.defaultZoomLevel),
         box,
         settings.getOrElse(AnnotationSettings.default),
         isArchived = false,
@@ -305,46 +293,48 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
     boundingBox: Option[BoundingBox],
     settings: Option[AnnotationSettings])(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
 
+    def renameTrees(nml: NML) = {
+      // Only rename the trees of the tracings if there is more than one NML
+      if (nmls.length > 1) {
+        val prefix = nml.name.replaceAll("\\.[^.]*$", "") + "_"
+        nml.copy(trees = nml.trees.map(_.addNamePrefix(prefix)))
+      } else
+          nml
+    }
+
     nmls match {
-      case head :: tail =>
-        val startTracing = createFrom(head, BSONObjectID.generate().stringify, boundingBox, settings)
+      case nml :: tail =>
+        val startTracing = createFrom(renameTrees(nml), nml.timestamp.toString, boundingBox, settings)
 
         tail.foldLeft(startTracing) {
           case (f, s) =>
             for {
               t <- f
-              n <- createFrom(s, BSONObjectID.generate().stringify, boundingBox)
+              n <- createFrom(renameTrees(s), BSONObjectID.generate().stringify, boundingBox)
               r <- t.mergeWith(n, settings)
             } yield {
               r
             }
         }
-      case _ =>
+      case _           =>
         Fox.empty
     }
   }
 }
 
-trait SkeletonTracingWrites extends FoxImplicits{
+trait SkeletonTracingWrites extends FoxImplicits {
 
   implicit object SkeletonTracingXMLWrites extends XMLWrites[SkeletonTracing] with GlobalDBAccess {
     def writes(e: SkeletonTracing): Fox[scala.xml.Node] = {
       for {
-        dataSet <- DataSetDAO.findOneBySourceName(e.dataSetName)
-        dataSource <- dataSet.dataSource.toFox
+        parameters <- AnnotationContent.writeParametersAsXML(e)
         treesXml <- Xml.toXML(e.trees.filterNot(_.nodes.isEmpty))
         branchpoints <- Xml.toXML(e.trees.flatMap(_.branchPoints).sortBy(-_.timestamp))
         comments <- Xml.toXML(e.trees.flatMap(_.comments))
       } yield {
         <things>
           <parameters>
-            <experiment name={dataSet.name}/>
-            <scale x={dataSource.scale.x.toString} y={dataSource.scale.y.toString} z={dataSource.scale.z.toString}/>
-            <offset x="0" y="0" z="0"/>
-            <time ms={e.timestamp.toString}/>
-            {e.activeNodeId.map(id => scala.xml.XML.loadString(s"""<activeNode id="$id"/>""")).getOrElse(scala.xml.Null)}
-            <editPosition x={e.editPosition.x.toString} y={e.editPosition.y.toString} z={e.editPosition.z.toString}/>
-            <zoomLevel zoom={e.zoomLevel.toString}/>
+            {parameters}{e.activeNodeId.map(id => scala.xml.XML.loadString(s"""<activeNode id="$id"/>""")).getOrElse(scala.xml.Null)}
           </parameters>{treesXml}<branchpoints>
           {branchpoints}
         </branchpoints>

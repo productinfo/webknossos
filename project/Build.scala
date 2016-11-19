@@ -261,7 +261,7 @@ object ApplicationBuild extends Build {
     libraryDependencies ++= oxalisDependencies,
     resolvers ++= dependencyResolvers,
     sourceDirectory in Assets := file("none"),
-
+    updateOptions := updateOptions.value.withLatestSnapshots(true),
     unmanagedJars in Compile ++= {
       val libs = baseDirectory.value / "lib"
       val subs = (libs ** "*") filter { _.isDirectory }
