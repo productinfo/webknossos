@@ -23,6 +23,6 @@ object utils {
     if (trees.isEmpty)
       0
     else
-      trees.map(_.treeId).max
+      trees.map(_.id).max
   }
 }

@@ -5,6 +5,7 @@ package models.tracing.skeleton.persistence
 
 import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
 import models.annotation.AnnotationSettings
+import models.tracing.skeleton.SkeletonTracing
 
 case class SkeletonTracingInit(
   dataSetName: String,
@@ -14,3 +15,18 @@ case class SkeletonTracingInit(
   insertStartAsNode: Boolean,
   isFirstBranchPoint: Boolean,
   settings: AnnotationSettings = AnnotationSettings.skeletonDefault)
+
+
+object SkeletonTracingInit{
+  def from(s: SkeletonTracing) = {
+    SkeletonTracingInit(
+      s.dataSetName,
+      s.editPosition,
+      s.editRotation,
+      s.boundingBox,
+      insertStartAsNode = false,
+      isFirstBranchPoint = false,
+      s.settings
+    )
+  }
+}

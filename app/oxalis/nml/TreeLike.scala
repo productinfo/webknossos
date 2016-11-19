@@ -6,7 +6,7 @@ import play.api.libs.json.{Json, Writes}
 import com.scalableminds.util.xml.XMLUtils._
 
 trait TreeLike {
-  def treeId: Int
+  def id: Int
   def color: Option[Color]
   def nodes: Set[Node]
   def edges: Set[Edge]
@@ -36,7 +36,7 @@ object TreeLike{
         nodes <- Xml.toXML(t.nodes.toSeq.sortBy(_.id))
         edges <- Xml.toXML(t.edges.toSeq)
       } yield {
-        <thing id={ t.treeId.toString } color.r={ t.color.map(_.r.toString) } color.g={ t.color.map(_.g.toString) } color.b={ t.color.map(_.b.toString) } color.a={ t.color.map(_.a.toString) } name={t.name}>
+        <thing id={ t.id.toString } color.r={ t.color.map(_.r.toString) } color.g={ t.color.map(_.g.toString) } color.b={ t.color.map(_.b.toString) } color.a={ t.color.map(_.a.toString) } name={t.name}>
           <nodes>
             { nodes}
           </nodes>
@@ -61,7 +61,7 @@ object TreeLike{
     val BRANCHPOINTS = "branchPoints"
 
     def writes(t: TreeLike) = Json.obj(
-      ID -> t.treeId,
+      ID -> t.id,
       NODES -> t.nodes,
       EDGES -> t.edges,
       NAME -> t.name,

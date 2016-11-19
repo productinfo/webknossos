@@ -5,17 +5,39 @@ import com.scalableminds.util.image.Color
 import play.api.libs.json.Json
 
 case class Tree(
-  treeId: Int,
-  nodes: Set[Node],
-  edges: Set[Edge],
-  color: Option[Color],
-  branchPoints: List[BranchPoint],
-  comments: List[Comment],
+  id: Int,
+  nodes: Set[Node] = Set.empty,
+  edges: Set[Edge] = Set.empty,
+  color: Option[Color] = None,
+  branchPoints: List[BranchPoint] = Nil,
+  comments: List[Comment] = Nil,
   name: String = "") extends TreeLike {
 
   def addNodes(ns: Set[Node]) = this.copy(nodes = nodes ++ ns)
 
-  def removeNode(nid: Int) = this.copy(nodes = nodes.filter(_.id != nid))
+  def removeNode(nid: Int) = this.copy(
+    nodes = nodes.filter(_.id != nid),
+    branchPoints = branchPoints.filter(_.id != nid),
+    comments = comments.filter(_.node != nid))
+
+  def moveTreeComponent(nodeIds: Set[Int], other: Tree) = {
+    val (targetNodes, sourceNodes) = nodes.partition(n => nodeIds.contains(n.id))
+    val (targetEdges, sourceEdges) = edges.partition(e => nodeIds.contains(e.source) && nodeIds.contains(e.target))
+    val (targetBP, sourceBP) = branchPoints.partition(b => nodeIds.contains(b.id))
+    val (targetC, sourceC) = comments.partition(c => nodeIds.contains(c.node))
+    val filteredSourceEdges = sourceEdges.filterNot(e => nodeIds.contains(e.source) || nodeIds.contains(e.target))
+    val updatedTargetTree = other
+                            .addNodes(targetNodes)
+                            .addEdges(targetEdges)
+                            .copy(branchPoints = other.branchPoints ::: targetBP, comments = other.comments ::: targetC)
+    val updatedSourceTree = this.copy(
+      nodes = sourceNodes,
+      edges = filteredSourceEdges,
+      branchPoints = sourceBP,
+      comments = sourceC)
+
+    (updatedSourceTree, updatedTargetTree)
+  }
 
   def updateNode(node: Node) = this.copy(nodes = nodes.filter(_.id != node.id) + node)
 
@@ -46,7 +68,7 @@ case class Tree(
   }
 
   def changeTreeId(updatedTreeId: Int) = {
-    this.copy(treeId = updatedTreeId)
+    this.copy(id = updatedTreeId)
   }
 
   def changeName(newName: String) = {

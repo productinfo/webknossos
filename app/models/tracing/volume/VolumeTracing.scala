@@ -1,7 +1,7 @@
 package models.tracing.volume
 
 import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
-import models.annotation.{AnnotationContent, AnnotationContentService, AnnotationLike, AnnotationSettings}
+import models.annotation._
 import models.basics.SecuredBaseDAO
 import models.binary._
 import java.io.{InputStream, PipedInputStream, PipedOutputStream}
@@ -108,7 +108,7 @@ object VolumeTracingService extends AnnotationContentService with CommonTracingS
 
   def dao = VolumeTracingDAO
 
-  def updateFromJson(id: String, json: JsValue)(implicit ctx: DBAccessContext): Fox[VolumeTracing] = {
+  def updateFromJson(id: String, json: JsValue)(implicit ctx: DBAccessContext): Fox[Boolean] = {
     json match {
       case JsArray(jsUpdates) =>
         val updates = jsUpdates.flatMap { json =>
@@ -120,7 +120,7 @@ object VolumeTracingService extends AnnotationContentService with CommonTracingS
             case (f, updater) => f.flatMap(tracing => updater.update(tracing))
           }
           _ <- VolumeTracingDAO.update(updatedTracing._id, updatedTracing.copy(timestamp = System.currentTimeMillis))(GlobalAccessContext)
-        } yield updatedTracing
+        } yield true
       case t                  =>
         Failure("format.json.invalid")
     }
@@ -137,7 +137,7 @@ object VolumeTracingService extends AnnotationContentService with CommonTracingS
       _ <- UserDataLayerDAO.insert(dataLayer)
       _ <- VolumeTracingDAO.insert(volumeTracing)
     } yield {
-      volumeTracing
+      ContentReference(VolumeTracing.contentType, volumeTracing.id)
     }
   }
 
@@ -150,7 +150,7 @@ object VolumeTracingService extends AnnotationContentService with CommonTracingS
     }
   }
 
-  def clearAndRemove(id: String)(implicit ctx: DBAccessContext): Fox[Boolean] =
+  def clearAndRemove(id: String)(implicit ctx: DBAccessContext): Fox[ContentReference] =
     ???
 }
 

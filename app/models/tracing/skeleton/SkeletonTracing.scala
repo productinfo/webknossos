@@ -36,7 +36,7 @@ case class SkeletonTracing(
 
   type Self = SkeletonTracing
 
-  lazy val treeMap = trees.map(t => t.treeId -> t).toMap
+  lazy val treeMap = trees.map(t => t.id -> t).toMap
 
   lazy val stats = {
     val numberOfTrees = trees.size
@@ -61,7 +61,31 @@ case class SkeletonTracing(
     treeMap.get(treeId)
 
   def doesTreeExist(treeId: Int) =
-    trees.find(t => t.treeId == treeId)
+    trees.find(t => t.id == treeId)
+
+  def maxTreeId = {
+    if(trees.nonEmpty)
+      Some(trees.maxBy(_.id).id)
+    else
+      None
+  }
+
+  def splitByNodes(maxNodeCount: Int) = {
+    def splitStep(t: SkeletonTracing, mergeMapping: Map[Int, Int]): (SkeletonTracing, Map[Int, Int]) = {
+      t.trees.find(_.nodes.size > maxNodeCount) match {
+        case Some(tree) =>
+          val nextTreeId = t.maxTreeId.map(_ + 1).getOrElse(0)
+          val nodeIds = tree.nodes.take(maxNodeCount).map(_.id)
+          val (splittedOriginal, splittedTarget) = tree.moveTreeComponent(nodeIds, Tree(nextTreeId))
+          val updated = t.withUpdatedTree(tree.id, splittedOriginal).withNewTree(splittedTarget)
+          splitStep(updated, mergeMapping + (splittedTarget.id -> tree.id))
+        case _ =>
+          (t, mergeMapping)
+      }
+    }
+
+    splitStep(this, Map.empty)
+  }
 
   def withNewNodeInTree(treeId: Int, node: Node) = {
     treeMap.get(treeId).map { tree =>
@@ -98,13 +122,24 @@ case class SkeletonTracing(
     }.getOrElse(this)
   }
 
-  def withUpdatedTree(treeId: Int, tree: Tree) = {
-    this.copy(trees = tree :: trees.filter(_.treeId != treeId))
+  def withNewTree(tree: Tree) = {
+    this.copy(trees = tree :: trees)
   }
 
-  def withUpdatedTreeProperties(treeId: Int, updatedId: Int, color: Option[Color], name: String, branchPoints: List[BranchPoint], comments: List[Comment]) = {
+  def withUpdatedTree(treeId: Int, tree: Tree) = {
+    this.copy(trees = tree :: trees.filter(_.id != treeId))
+  }
+
+  def withUpdatedTreeProperties(
+    treeId: Int,
+    updatedId: Int,
+    color: Option[Color],
+    name: String,
+    branchPoints: List[BranchPoint],
+    comments: List[Comment]) = {
+
     treeMap.get(treeId).map { tree =>
-      val updatedTree = tree.copy(treeId = updatedId, color = color, name = name, branchPoints = branchPoints, comments = comments)
+      val updatedTree = tree.copy(id = updatedId, color = color, name = name, branchPoints = branchPoints, comments = comments)
       withUpdatedTree(treeId, updatedTree)
     }.getOrElse(this)
   }
@@ -114,15 +149,10 @@ case class SkeletonTracing(
       sourceTree <- treeMap.get(sourceTreeId)
       targetTree <- treeMap.get(targetTreeId)
     } yield {
-      val (targetNodes, sourceNodes) = sourceTree.nodes.partition(n => nodeIds.contains(n.id))
-      val (targetEdges, sourceEdges) = sourceTree.edges.partition(e => nodeIds.contains(e.source) && nodeIds.contains(e.target))
-      val filteredSourceEdges = sourceEdges.filterNot(e => nodeIds.contains(e.source) || nodeIds.contains(e.target))
-      val updatedTargetTree = targetTree.addNodes(targetNodes).addEdges(targetEdges)
-      val updatedSourceTree = sourceTree.copy(nodes = sourceNodes, edges = filteredSourceEdges)
-      withUpdatedTree(targetTreeId, updatedTargetTree).withUpdatedTree(sourceTreeId, updatedSourceTree)
+      val (sourceUpdated, targetUpdated) = sourceTree.moveTreeComponent(nodeIds, targetTree)
+      withUpdatedTree(targetTreeId, targetUpdated).withUpdatedTree(sourceTreeId, sourceUpdated)
     }
     updated getOrElse this
-
   }
 
   def withMergedTrees(sourceTreeId: Int, targetTreeId: Int) = {
@@ -130,14 +160,19 @@ case class SkeletonTracing(
       sourceTree <- treeMap.get(sourceTreeId)
       targetTree <- treeMap.get(targetTreeId)
     } yield {
-      val updatedTree = targetTree.addNodes(sourceTree.nodes).addEdges(sourceTree.edges)
+      val updatedTree = targetTree
+                        .addNodes(sourceTree.nodes)
+                        .addEdges(sourceTree.edges)
+                        .copy(
+                          branchPoints = targetTree.branchPoints ::: sourceTree.branchPoints,
+                          comments = targetTree.comments ::: sourceTree.comments)
       withoutTree(sourceTreeId).withUpdatedTree(targetTreeId, updatedTree)
     }
     updated getOrElse this
   }
 
   def withoutTree(treeId: Int) = {
-    this.copy(trees = trees.filter(_.treeId != treeId))
+    this.copy(trees = trees.filter(_.id != treeId))
   }
 
   def renameTrees(reNamer: Tree => String) = {
@@ -147,7 +182,10 @@ case class SkeletonTracing(
   def maxNodeId =
     oxalis.nml.utils.maxNodeId(trees)
 
-  def mergeWith(annotationContent: AnnotationContent, settings: Option[AnnotationSettings])(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
+  def mergeWith(
+    annotationContent: AnnotationContent,
+    settings: Option[AnnotationSettings])(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
+
     def mergeBoundingBoxes(aOpt: Option[BoundingBox], bOpt: Option[BoundingBox]) =
       for {
         a <- aOpt
@@ -188,11 +226,15 @@ case class SkeletonTracing(
 
 trait TreeMergeHelpers {
 
-  protected def mergeTrees(sourceTrees: Iterable[Tree], targetTrees: Iterable[Tree], nodeMapping: FunctionalNodeMapping) = {
+  protected def mergeTrees(
+    sourceTrees: Iterable[Tree],
+    targetTrees: Iterable[Tree],
+    nodeMapping: FunctionalNodeMapping) = {
+
     val treeMaxId = maxTreeId(targetTrees)
 
     val mappedSourceTrees = sourceTrees.map(tree =>
-      tree.changeTreeId(tree.treeId + treeMaxId).applyNodeMapping(nodeMapping))
+      tree.changeTreeId(tree.id + treeMaxId).applyNodeMapping(nodeMapping))
 
     List.concat(targetTrees, mappedSourceTrees)
   }
@@ -258,16 +300,20 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
     tracing.copy(id = id)
   }
 
-  def createFrom(nmls: List[NML], boundingBox: Option[BoundingBox], settings: Option[AnnotationSettings])(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
+  def createFrom(
+    nmls: List[NML],
+    boundingBox: Option[BoundingBox],
+    settings: Option[AnnotationSettings])(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
+
     nmls match {
       case head :: tail =>
-        val startTracing = createFrom(head, head.timestamp.toString, boundingBox, settings)
+        val startTracing = createFrom(head, BSONObjectID.generate().stringify, boundingBox, settings)
 
         tail.foldLeft(startTracing) {
           case (f, s) =>
             for {
               t <- f
-              n <- createFrom(s, s.timestamp.toString, boundingBox)
+              n <- createFrom(s, BSONObjectID.generate().stringify, boundingBox)
               r <- t.mergeWith(n, settings)
             } yield {
               r
@@ -286,7 +332,7 @@ trait SkeletonTracingWrites extends FoxImplicits{
       for {
         dataSet <- DataSetDAO.findOneBySourceName(e.dataSetName)
         dataSource <- dataSet.dataSource.toFox
-        treesXml = Xml.toXML(e.trees.filterNot(_.nodes.isEmpty))
+        treesXml <- Xml.toXML(e.trees.filterNot(_.nodes.isEmpty))
         branchpoints <- Xml.toXML(e.trees.flatMap(_.branchPoints).sortBy(-_.timestamp))
         comments <- Xml.toXML(e.trees.flatMap(_.comments))
       } yield {
@@ -295,7 +341,9 @@ trait SkeletonTracingWrites extends FoxImplicits{
             <experiment name={dataSet.name}/>
             <scale x={dataSource.scale.x.toString} y={dataSource.scale.y.toString} z={dataSource.scale.z.toString}/>
             <offset x="0" y="0" z="0"/>
-            <time ms={e.timestamp.toString}/>{e.activeNodeId.map(id => scala.xml.XML.loadString(s"""<activeNode id="$id"/>""")).getOrElse(scala.xml.Null)}<editPosition x={e.editPosition.x.toString} y={e.editPosition.y.toString} z={e.editPosition.z.toString}/>
+            <time ms={e.timestamp.toString}/>
+            {e.activeNodeId.map(id => scala.xml.XML.loadString(s"""<activeNode id="$id"/>""")).getOrElse(scala.xml.Null)}
+            <editPosition x={e.editPosition.x.toString} y={e.editPosition.y.toString} z={e.editPosition.z.toString}/>
             <zoomLevel zoom={e.zoomLevel.toString}/>
           </parameters>{treesXml}<branchpoints>
           {branchpoints}

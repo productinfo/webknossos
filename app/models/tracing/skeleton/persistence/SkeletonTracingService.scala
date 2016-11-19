@@ -8,7 +8,7 @@ import java.util.UUID
 import akka.actor.{ActorRef, ActorSystem}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import com.scalableminds.util.reactivemongo.{DBAccessContext, GlobalAccessContext}
-import models.annotation.{AnnotationContentService, AnnotationSettings}
+import models.annotation.{AnnotationContentService, AnnotationSettings, ContentReference}
 import models.tracing.CommonTracingService
 import oxalis.nml.{BranchPoint, Comment, NML, TreeLike}
 import akka.pattern.ask
@@ -38,10 +38,10 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
 
   implicit val timeout = Timeout(5.seconds)
 
-  lazy val underlying: ActorRef = start(Akka.system)
+  var underlying: ActorRef = _
 
   def start(system: ActorSystem) = {
-    ClusterSharding(system).start(
+    underlying = ClusterSharding(system).start(
       typeName = SkeletonTracingProcessor.shardName,
       entityProps = SkeletonTracingProcessor.props,
       settings = ClusterShardingSettings(system),
@@ -49,12 +49,10 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
       extractShardId = SkeletonTracingProcessor.shardResolver)
   }
 
-  private def cmdResult2Fox(result: SkeletonAck): Box[SkeletonTracing] = {
+  private def cmdResult2Fox(result: SkeletonAck): Box[Boolean] = {
     result match {
-      case ValidUpdateAck(_, Some(skeleton)) =>
-        Full(skeleton)
-      case ValidUpdateAck(_, None) =>
-        Failure("FAILURE. Actor responded with SkeletonAck but empty skeleton.")
+      case ValidUpdateAck(_) =>
+        Full(true)
       case InvalidUpdateAck(_, msg) =>
         Failure(msg)
       case InvalidCmdAck(_, msg) =>
@@ -62,36 +60,39 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
     }
   }
 
-  private def retrieveUnderlyingCmdResult(cmd: SkeletonCmd): Fox[SkeletonTracing] = {
+  private def retrieveUnderlyingCmdResult(cmd: SkeletonCmd): Fox[Boolean] = {
     for{
       response <- (underlying ? cmd).mapTo[SkeletonAck].toFox
       result <- cmdResult2Fox(response)
     } yield result
   }
 
+  private def retrieveUnderlyingCmdResult(cmds: List[SkeletonCmd]): Fox[Boolean] = {
+    Fox.serialSequence(cmds)(c => retrieveUnderlyingCmdResult(c)).map(_.last).toFox
+  }
+
   def clearAndRemove(tracingId: String)(implicit ctx: DBAccessContext) = {
-    retrieveUnderlyingCmdResult(ResetSkeletonCmd(tracingId)).map(_ => true)
+    retrieveUnderlyingCmdResult(ResetSkeletonCmd(tracingId)).map(_ => ContentReference(SkeletonTracing.contentType, tracingId))
   }
 
-  def createFrom(skeleton: SkeletonTracing): Fox[SkeletonTracing] = {
-    retrieveUnderlyingCmdResult(SetSkeletonCmd(skeleton.id, skeleton))
+  def createFrom(skeleton: SkeletonTracing): Fox[ContentReference] = {
+    val initCommand = InitSkeletonCmd(skeleton.id, SkeletonTracingInit.from(skeleton))
+    val (splitted, mapping) = skeleton.splitByNodes(maxNodeCount=1000)
+
+    val treeCreateCommands = splitted.trees.map(t => CreateTreeCmd(skeleton.id, t))
+    val mergeCommands = mapping.toList.map{case (target, source) => MergeTreesCmd(skeleton.id, source, target)}
+
+    retrieveUnderlyingCmdResult(initCommand :: treeCreateCommands ::: mergeCommands)
+    .map( _ => ContentReference(SkeletonTracing.contentType, skeleton.id))
   }
 
-  def createFrom(skeleton: SkeletonTracingInit): Fox[SkeletonTracing] = {
-    retrieveUnderlyingCmdResult(InitSkeletonCmd(BSONObjectID.generate.stringify, skeleton))
+  def createFrom(skeleton: SkeletonTracingInit): Fox[ContentReference] = {
+    val skeletonId = BSONObjectID.generate.stringify
+    retrieveUnderlyingCmdResult(InitSkeletonCmd(skeletonId, skeleton))
+      .map( _ => ContentReference(SkeletonTracing.contentType, skeletonId))
   }
 
-  def createFrom(nmls: List[NML], boundingBox: Option[BoundingBox], settings: AnnotationSettings)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
-    SkeletonTracing.createFrom(nmls, boundingBox, Some(settings)).flatMap { temporary =>
-      createFrom(temporary)
-    }
-  }
-
-  def createFrom(nml: NML, boundingBox: Option[BoundingBox], settings: AnnotationSettings)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
-    createFrom(List(nml), boundingBox, settings)
-  }
-
-  def createFrom(dataSet: DataSet)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] =
+  def createFrom(dataSet: DataSet)(implicit ctx: DBAccessContext): Fox[ContentReference] =
     createFrom(SkeletonTracingInit(dataSet.name, dataSet.defaultStart, dataSet.defaultRotation, None, insertStartAsNode = false, isFirstBranchPoint = false))
 
   def archiveById(_skeleton: BSONObjectID)(implicit ctx: DBAccessContext) =
@@ -102,16 +103,16 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
 
   def findOneById(tracingId: String)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
     Logger.error(s"Looking for $tracingId")
-    (underlying ? GetSkeletonQuery(tracingId)).mapTo[SkeletonResponse].map(_.skeleton).toFox.orElse{
+    (underlying ? GetSkeletonQuery(tracingId)).mapTo[SkeletonResponse].map{r => SkeletonTracingTempStore.popEntry(r.retrievalKey)}.toFox.orElse{
       Logger.warn("USING DB tracing fallback!")
-      DBSkeletonTracingService.findOneById(tracingId).flatMap(createFrom)
+      DBSkeletonTracingService.findOneById(tracingId).flatMap(s => createFrom(s).map(_ => s))
     }
   }
 
   def uniqueTreePrefix(tracing: SkeletonTracing, user: Option[User], task: Option[Task])(tree: TreeLike): String = {
     val userName = user.map(_.abreviatedName) getOrElse ""
     val taskName = task.map(_.id) getOrElse ""
-    formatHash(taskName) + "_" + userName + "_" + f"tree${tree.treeId}%03d"
+    formatHash(taskName) + "_" + userName + "_" + f"tree${tree.id}%03d"
   }
 
   def renameTreesOfTracing(tracing: SkeletonTracing, user: Fox[User], task: Fox[Task])(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
@@ -122,12 +123,12 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
       tracing.renameTrees(uniqueTreePrefix(tracing, u, t))
   }
 
-  def updateFromJson(id: String, json: JsValue)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
+  def updateFromJson(id: String, json: JsValue)(implicit ctx: DBAccessContext): Fox[Boolean] = {
     json.validate(JsonTracingUpdateParser.parseUpdateArray(id)) match {
       case JsSuccess(updates, _) =>
         Fox.combined(updates.map { updateCmd =>
           retrieveUnderlyingCmdResult(updateCmd)
-        }).flatMap(_ => findOneById(id))
+        }).flatMap(_.headOption) //.flatMap(_ => findOneById(id))
       case e: JsError =>
         Logger.warn("Failed to parse all update commands from json. " + JsonUtils.jsError2HumanReadable(e))
         Fox.failure(JsonUtils.jsError2HumanReadable(e))

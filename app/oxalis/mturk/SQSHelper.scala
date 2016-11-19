@@ -46,7 +46,7 @@ class SQSHelper(sqsConfig: SQSConfiguration) extends LazyLogging {
       client.receiveMessage(request).getMessages.toList
     } catch {
       case e: Exception =>
-        logger.error(s"Failed to fetch SQS messages. Error: ${e.getMessage}", e)
+        logger.error(s"Failed to fetch SQS messages. Error: ${e.getMessage}")
         Nil
     }
   }

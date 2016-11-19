@@ -21,9 +21,9 @@ class ActivityMonitor extends Actor {
 
   val updateCycle = 5 minutes
 
-  override def preStart = {
-    context.system.scheduler.schedule(updateCycle, updateCycle, self, FlushActivities)
-  }
+  val tick = context.system.scheduler.schedule(updateCycle, updateCycle, self, FlushActivities)
+
+  override def postStop() = tick.cancel()
 
   def receive = {
     case UserActivity(user, time) =>

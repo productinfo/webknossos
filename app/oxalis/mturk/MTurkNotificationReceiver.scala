@@ -3,14 +3,14 @@ package oxalis.mturk
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, Cancellable, Props}
 import com.amazonaws.services.sqs.model.Message
 import com.scalableminds.util.reactivemongo.GlobalAccessContext
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import com.typesafe.scalalogging.LazyLogging
 import models.mturk.{MTurkSQSQueue, MTurkSQSQueueDAO}
 import net.liftweb.common.{Failure, Full}
-import play.api.Application
+import play.api.{Application, Play}
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import play.api.libs.json._
@@ -65,10 +65,17 @@ object MTurkNotificationReceiver extends LazyLogging with FoxImplicits {
 
     implicit val exco = context.dispatcher
 
-    override def preStart() = {
+    lazy val offlineMode = Play.configuration.getBoolean("application.offlineMode").getOrElse(false)
+
+    override def preStart(): Unit = {
       logger.info("Started mturk notification receiver.")
-      context.system.scheduler.scheduleOnce(1.second, self, RequestNotifications)
+      if(!offlineMode)
+        context.system.scheduler.scheduleOnce(1.second, self, RequestNotifications)
+      else
+        logger.warn("Mturk notification requests DISABLED (offline mode set in config).")
     }
+
+    override def postRestart(reason: Throwable): Unit = { }
 
     def receive = {
       case RequestNotifications =>

@@ -26,15 +26,15 @@ trait AnnotationContentService {
 
   def updateSettings(settings: AnnotationSettings, tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean]
 
-  def updateFromJson(id: String, jsUpdate: JsValue)(implicit ctx: DBAccessContext): Fox[AType]
+  def updateFromJson(id: String, jsUpdate: JsValue)(implicit ctx: DBAccessContext): Fox[Boolean]
 
   def updateEditPosRot(editPosition: Point3D, editRotation: Vector3D, tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean]
 
   def findOneById(id: String)(implicit ctx: DBAccessContext): Fox[AType]
 
-  def createFrom(dataSet: DataSet)(implicit ctx: DBAccessContext): Fox[AType]
+  def createFrom(dataSet: DataSet)(implicit ctx: DBAccessContext): Fox[ContentReference]
 
-  def clearAndRemove(id: String)(implicit ctx: DBAccessContext): Fox[Boolean]
+  def clearAndRemove(id: String)(implicit ctx: DBAccessContext): Fox[ContentReference]
 }
 
 trait AnnotationContentProviders {

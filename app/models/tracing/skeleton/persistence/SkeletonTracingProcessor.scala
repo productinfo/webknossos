@@ -3,6 +3,8 @@
  */
 package models.tracing.skeleton.persistence
 
+import java.util.UUID
+
 import scala.concurrent.duration._
 
 import akka.actor.Props
@@ -10,19 +12,19 @@ import akka.cluster.sharding.ShardRegion
 import akka.event.LoggingReceive
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import com.scalableminds.util.geometry.BoundingBox
+import com.typesafe.scalalogging.LazyLogging
 import models.tracing.skeleton.SkeletonTracing
 import oxalis.actor.{ALogging, Passivation}
 import oxalis.nml._
-import play.api.Logger
 
-object SkeletonTracingProcessor {
+object SkeletonTracingProcessor extends LazyLogging {
 
   def props: Props = Props(new SkeletonTracingProcessor)
 
   val idExtractor: ShardRegion.ExtractEntityId = new PartialFunction[ShardRegion.Msg, (ShardRegion.EntityId, ShardRegion.Msg)] {
     override def isDefinedAt(x: ShardRegion.Msg): Boolean = x match {
       case m: SkeletonMsg => true
-      case m              => Logger.error(s"Shard '$shardName' received invalid msg type: " + m); false
+      case m              => logger.error(s"Shard '$shardName' received invalid msg type: " + m); false
     }
 
     override def apply(v1: ShardRegion.Msg) = v1 match {
@@ -37,16 +39,20 @@ object SkeletonTracingProcessor {
   }
 
   val shardName: String = "SkeletonTracingProcessor"
+
+  def inactivityTimeout = 1.minute
 }
 
-class SkeletonTracingProcessor extends PersistentActor with Passivation with ALogging {
+class SkeletonTracingProcessor extends PersistentActor with Passivation with ALogging with LazyLogging{
+
+  logger.warn("SKELETON TRACING PROCESSOR STARTED! NAME: " + self.path.name)
 
   var state: Option[SkeletonTracing] = None
 
   /** passivate the entity when no activity for 1 minute */
-  context.setReceiveTimeout(1.minute)
+  context.setReceiveTimeout(SkeletonTracingProcessor.inactivityTimeout)
 
-  override def persistenceId: String = self.path.parent.name + "-" + self.path.name
+  override def persistenceId: String = "skeleton-" + self.path.name
 
   /**
     * Updates skeleton state
@@ -136,16 +142,11 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
         updateStateAndNotifySender(id, event)
       }
       updateBehaviour(traceableSkeleton)
-    case SetSkeletonCmd(id, skeleton)    =>
-      persist(WholeTracingChangedEvt(id, skeleton)) { event =>
-        updateStateAndNotifySender(id, event)
-      }
-      updateBehaviour(traceableSkeleton)
   }
 
   def updateStateAndNotifySender(skeletonId: String, evt: SkeletonEvt) = {
     state = updateState(evt, state)
-    sender() ! ValidUpdateAck(skeletonId, state)
+    sender() ! ValidUpdateAck(skeletonId)
   }
 
   def handleCmd(cmd: SkeletonCmd, isValid: => Boolean, eventBuilder: => List[SkeletonEvt], errorMsgIfInvalid: String) = {
@@ -192,14 +193,6 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
         errorMsgIfInvalid = "Edge that should be deleted doesn't exists " + cmd.edge
       )
 
-    case cmd: SetSkeletonCmd =>
-      handleCmd(
-        cmd,
-        isValid = true,
-        eventBuilder = WholeTracingChangedEvt(cmd.skeletonId, cmd.skeleton) :: Nil,
-        errorMsgIfInvalid = ""
-      )
-
     case cmd: UpdateNodePropertiesCmd =>
       handleCmd(
         cmd,
@@ -228,14 +221,14 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
     case cmd: CreateTreeCmd =>
       handleCmd(
         cmd,
-        isValid = state.exists(_.tree(cmd.tree.treeId).isEmpty),
+        isValid = state.exists(_.tree(cmd.tree.id).isEmpty),
         eventBuilder = TreeCreatedEvt(cmd.skeletonId, cmd.tree) :: Nil,
-        errorMsgIfInvalid = "Tree already exists. ID:" + cmd.tree.treeId
+        errorMsgIfInvalid = "Tree already exists. ID:" + cmd.tree.id
       )
 
     case cmd: UpdateTreePropertiesCmd =>
       val event = state.flatMap(_.tree(cmd.treeId)).map { tree =>
-        TreePropertiesUpdatedEvt(cmd.skeletonId, tree.treeId, cmd.updatedId getOrElse tree.treeId, cmd.color, cmd.name, cmd.branchPoints, cmd.comments)
+        TreePropertiesUpdatedEvt(cmd.skeletonId, tree.id, cmd.updatedId getOrElse tree.id, cmd.color, cmd.name, cmd.branchPoints, cmd.comments)
       }
 
       handleCmd(
@@ -271,7 +264,7 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
 
     case cmd: ResetSkeletonCmd =>
       val events = state.map { tracing =>
-        val treeDeletions = tracing.trees.map(t => TreeDeletedEvt(cmd.skeletonId, t.treeId))
+        val treeDeletions = tracing.trees.map(t => TreeDeletedEvt(cmd.skeletonId, t.id))
 
         treeDeletions
       } getOrElse Nil
@@ -314,11 +307,11 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
   /**
     * Once recovery is complete, check the state to become the appropriate behaviour
     */
-  def postRecoveryBecome(auctionRecoverStateMaybe: Option[SkeletonTracing]): Unit =
-    auctionRecoverStateMaybe.fold[Unit]({}) { auctionState =>
+  def postRecoveryBecome(skeletonRecoverStateMaybe: Option[SkeletonTracing]): Unit =
+    skeletonRecoverStateMaybe.foreach { skeletonState =>
       log.info("postRecoveryBecome")
-      state = Some(auctionState)
-      if (auctionState.isArchived) {
+      state = Some(skeletonState)
+      if (skeletonState.isArchived) {
         updateBehaviour(archivedSkeleton)
       } else {
         updateBehaviour(traceableSkeleton)
@@ -326,18 +319,20 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
     }
 
   def updateBehaviour(behaviour: => Receive): Unit = {
-    Logger.debug("Switching behaviour of " + self.path.toString)
+    logger.debug("Switching behaviour of " + self.path.toString)
     context.become(passivate(behaviour.orElse(queries)).orElse(defaultCommands))
   }
 
   def queries: Receive = LoggingReceive.withLabel("queries") {
     case GetSkeletonQuery(skeletonId) =>
-      sender() ! SkeletonResponse(skeletonId, state)
+      val retrievalKey = UUID.randomUUID().toString
+      SkeletonTracingTempStore.pushEntry(retrievalKey, state)
+      sender() ! SkeletonResponse(skeletonId, retrievalKey)
   }
 
   def defaultCommands: Receive = LoggingReceive.withLabel("default") {
     case other => {
-      Logger.warn("unknownCommand:  " + other.toString + " ID: " + self.path.toString)
+      logger.warn("unknownCommand:  " + other.toString + " ID: " + self.path.toString)
       sender() ! InvalidCmdAck("", "InvalidSkeletonAck")
     }
   }
@@ -347,18 +342,24 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
 
   def receiveRecover: Receive = LoggingReceive {
     case WholeTracingChangedEvt(id, skeleton) =>
+      logger.warn("GOT WHOLE TRACING CHANGED EVT")
       skeletonRecoverStateMaybe =
         Some(skeleton)
 
-    case evt: SkeletonEvt => {
+    case evt: SkeletonEvt =>
+      logger.warn("GOT SKELETON EVENT")
       skeletonRecoverStateMaybe =
         updateState(evt.logInfo("receiveRecover evt:" + _.toString), skeletonRecoverStateMaybe)
-    }
 
-    case RecoveryCompleted => postRecoveryBecome(skeletonRecoverStateMaybe)
+    case RecoveryCompleted =>
+      logger.warn("RECOVERY COMPLETED! persistence id: " + persistenceId)
+      postRecoveryBecome(skeletonRecoverStateMaybe)
 
     // if snapshots are implemented, currently the aren't.
     case SnapshotOffer(_, snapshot: SkeletonTracing) =>
       skeletonRecoverStateMaybe = Some(snapshot)
+
+    case msg =>
+      logger.warn("GOT UNRECOGNIZED MESSAGE: " + msg)
   }
 }

@@ -86,11 +86,11 @@ object NMLParser {
     private def createUniqueIds(trees: Seq[Tree]) = {
       trees.foldLeft(List[Tree]()) {
         case (l, t) =>
-          if (!l.exists(_.treeId == t.treeId))
+          if (!l.exists(_.id == t.id))
             t :: l
           else {
-            val alteredId = l.maxBy(_.treeId).treeId + 1
-            t.copy(treeId = alteredId) :: l
+            val alteredId = l.maxBy(_.id).id + 1
+            t.copy(id = alteredId) :: l
           }
       }
     }
@@ -134,7 +134,7 @@ object NMLParser {
       components.map(
         _.copy(
           color = tree.color,
-          treeId = tree.treeId))
+          id = tree.id))
     }
 
     private def parseTrees(treeNodes: NodeSeq, branchPoints: Seq[BranchPoint], comments: Seq[Comment]) = {

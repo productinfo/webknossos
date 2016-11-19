@@ -17,8 +17,6 @@ sealed trait SkeletonCmd extends SkeletonMsg
 
 case class InitSkeletonCmd(skeletonId: String, initialParams: SkeletonTracingInit) extends SkeletonCmd
 
-case class SetSkeletonCmd(skeletonId: String, skeleton: SkeletonTracing) extends SkeletonCmd
-
 case class CreateNodeCmd(skeletonId: String, treeId: Int, node: Node) extends SkeletonCmd
 
 case class DeleteNodeCmd(skeletonId: String, treeId: Int, node: Int) extends SkeletonCmd
@@ -60,7 +58,7 @@ case class UpdateSettingsCmd(skeletonId: String,
 
 sealed trait SkeletonAck extends SkeletonMsg
 
-case class ValidUpdateAck(skeletonId: String, skeleton: Option[SkeletonTracing]) extends SkeletonAck
+case class ValidUpdateAck(skeletonId: String) extends SkeletonAck
 
 case class InvalidUpdateAck(skeletonId: String, msg: String) extends SkeletonAck
 
@@ -74,5 +72,5 @@ case class GetSkeletonQuery(skeletonId: String) extends SkeletonQuery
 
 sealed trait SkeletonQueryResponse extends SkeletonMsg
 
-case class SkeletonResponse(skeletonId: String, skeleton: Option[SkeletonTracing]) extends SkeletonQueryResponse
+case class SkeletonResponse(skeletonId: String, retrievalKey: String) extends SkeletonQueryResponse
 

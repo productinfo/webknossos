@@ -59,7 +59,7 @@ object Global extends GlobalSettings {
                    withFallback(conf)
 
       // Create an Akka system
-      val sys = ActorSystem("application", clusterConfig)
+      val sys = ActorSystem("webknossos", clusterConfig)
       // Create an actor that handles cluster domain events
       SkeletonTracingService.start(sys)
       sys

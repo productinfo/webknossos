@@ -12,9 +12,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object Dependencies{
   val akkaVersion = "2.4.1"
-  val reactiveVersion = "0.11.13"
-  val reactivePlayVersion = "0.11.13-play24"
-  val braingamesVersion = "8.13.10"
+  val reactiveVersion = "0.11.14"
+  val reactivePlayVersion = "0.11.14-play24"
+  val braingamesVersion = "8.15.2-SNAPSHOT"
   val twelvemonkeysVersion = "3.1.2"
   val twitterChillVersion = "0.8.0"
 
@@ -45,9 +45,7 @@ object Dependencies{
   val airbrake = "com.scalableminds" %% "play-airbrake" % "0.5.0"
   val mongev = "com.scalableminds" %% "play-mongev" % "0.4.1"
   val urlHelper = "com.netaporter" %% "scala-uri" % "0.4.14"
-  val leveldb = "org.iq80.leveldb" % "leveldb" % "0.7"
-  val leveldbjni = "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
-  val typesafeLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0"
+  val rxmongoakka = "com.github.scullxbones" %% "akka-persistence-mongo-rxmongo" % "1.3.6"
 
   // Unfortunately, we need to list all mturk dependencies seperately since mturk is not published on maven but rather
   // added to the project as a JAR. To keep the number of JARs added to this repo as small as possible, everthing that
@@ -217,7 +215,7 @@ object ApplicationBuild extends Build {
     akkaPersistence,
     akkaCluster,
     akkaClusterShard,
-    akkaPersistenceCassandra,
+    rxmongoakka,
     twitterChillSerialization,
     twitterChillAkkaSerialization,
     jerseyClient,
@@ -228,7 +226,6 @@ object ApplicationBuild extends Build {
     braingamesBinary,
     braingamesDatastore,
     scalaAsync,
-    typesafeLogging,
     cache,
     ws,
     scalaLogging,
