@@ -66,7 +66,7 @@ trait NMLParsingService {
     var otherFiles = Map.empty[String, TemporaryFile]
     var parseResults = List.empty[NMLParseResult]
     ZipIO.withUnziped(file, includeHiddenFiles = false) { (filename, file) =>
-      if (filename.endsWith(".nml")) {
+      if (filename.endsWith(NML.FileExtension)) {
         val result = NMLParser.parse(file, filename) match {
           case Full(nml)          =>
             NMLParseSuccess(name, nml)

@@ -66,7 +66,7 @@ object DataSetService extends FoxImplicits {
           dataSource.source,
           isActive = dataSource.isUsable)(GlobalAccessContext).futureBox
       case Full(_) =>
-        // TODO: There is a problem here. The dataset name is already in use. We are not going to update that datasource.
+        // There is a problem here. The dataset name is already in use. We are not going to update that datasource.
         // this should be somehow populated to the user to inform him that he needs to rename the datasource
         Fox.failure("dataset.name.alreadyInUse").futureBox
       case _ =>

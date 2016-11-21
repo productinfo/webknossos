@@ -40,6 +40,8 @@ trait AnnotationLike extends AnnotationStatistics {
 
   def content: Fox[AnnotationContent]
 
+  def contentReference: ContentReference
+
   def id: String
 
   def typ: AnnotationType
@@ -103,7 +105,7 @@ object AnnotationLike extends FoxImplicits with FilterableJson with UrlHelper{
       "formattedHash" +> Formatter.formatHash(a.id),
       "downloadUrl" +> a.relativeDownloadUrl.map(toAbsoluteUrl),
       "content" +> a.content.flatMap(AnnotationContent.writeAsJson(_)).getOrElse(JsNull),
-      "contentType" +> a.content.map(_.contentType).getOrElse(""),
+      "contentType" +> a.contentReference.contentType,
       "dataSetName" +> a.dataSetName
     )
   }

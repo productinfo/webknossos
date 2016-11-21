@@ -118,6 +118,7 @@ object CompoundAnnotation extends Formatter with FoxImplicits {
         _user,
         () => renameAnnotationContents(annotations)
               .flatMap(mergeAnnotationContent(_, id, settings)),
+        annotations.head.contentReference.copy(_id = id),
         None,
         team,
         downloadUrl,

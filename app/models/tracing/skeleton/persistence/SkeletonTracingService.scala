@@ -3,42 +3,40 @@
  */
 package models.tracing.skeleton.persistence
 
-import java.util.UUID
+import scala.concurrent.duration._
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
-import com.scalableminds.util.reactivemongo.{DBAccessContext, GlobalAccessContext}
-import models.annotation.{AnnotationContentService, AnnotationSettings, ContentReference}
-import models.tracing.CommonTracingService
-import oxalis.nml.{BranchPoint, Comment, NML, TreeLike}
 import akka.pattern.ask
-import scala.concurrent.duration._
-
 import akka.util.Timeout
 import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
 import com.scalableminds.util.json.JsonUtils
+import com.scalableminds.util.reactivemongo.DBAccessContext
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
+import com.typesafe.scalalogging.LazyLogging
 import models.annotation.CompoundAnnotation._
+import models.annotation.{AnnotationContentService, AnnotationSettings, ContentReference}
 import models.binary.DataSet
 import models.task.Task
 import models.tracing.skeleton.{DBSkeletonTracingService, JsonTracingUpdateParser, SkeletonTracing}
-import models.user.{UsedAnnotationDAO, User}
+import models.user.User
 import net.liftweb.common.{Box, Failure, Full}
-import play.api.libs.concurrent.Akka
-import play.api.{Logger, Play}
-import reactivemongo.bson.{BSON, BSONObjectID}
-import play.api.libs.concurrent.Execution.Implicits._
-import play.api.libs.json.{JsError, JsSuccess, JsValue}
+import oxalis.nml.{NML, TreeLike}
 import play.api.Play.current
 import play.api.i18n.Messages.Implicits._
+import play.api.libs.concurrent.Execution.Implicits._
+import play.api.libs.json.{JsError, JsSuccess, JsValue}
+import reactivemongo.bson.BSONObjectID
 
-object SkeletonTracingService extends AnnotationContentService with FoxImplicits{
+object SkeletonTracingService extends AnnotationContentService with FoxImplicits with LazyLogging{
 
   type AType = SkeletonTracing
 
   implicit val timeout = Timeout(5.seconds)
 
   var underlying: ActorRef = _
+
+  def downloadFileExtension: String = NML.FileExtension
 
   def start(system: ActorSystem) = {
     underlying = ClusterSharding(system).start(
@@ -51,17 +49,17 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
 
   private def cmdResult2Fox(result: SkeletonAck): Box[Boolean] = {
     result match {
-      case ValidUpdateAck(_) =>
+      case ValidUpdateAck(_)        =>
         Full(true)
       case InvalidUpdateAck(_, msg) =>
         Failure(msg)
-      case InvalidCmdAck(_, msg) =>
+      case InvalidCmdAck(_, msg)    =>
         Failure(msg)
     }
   }
 
   private def retrieveUnderlyingCmdResult(cmd: SkeletonCmd): Fox[Boolean] = {
-    for{
+    for {
       response <- (underlying ? cmd).mapTo[SkeletonAck].toFox
       result <- cmdResult2Fox(response)
     } yield result
@@ -76,20 +74,25 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
   }
 
   def createFrom(skeleton: SkeletonTracing): Fox[ContentReference] = {
+    logger.info("Started to create messages for actor init. ID: " + skeleton.id)
+    val stopPersistCmd = StopEventPersistence(skeleton.id)
     val initCommand = InitSkeletonCmd(skeleton.id, SkeletonTracingInit.from(skeleton))
-    val (splitted, mapping) = skeleton.splitByNodes(maxNodeCount=1000)
+    val (splitted, mapping) = skeleton.splitByNodes(maxNodeCount = 5000)
 
     val treeCreateCommands = splitted.trees.map(t => CreateTreeCmd(skeleton.id, t))
-    val mergeCommands = mapping.toList.map{case (target, source) => MergeTreesCmd(skeleton.id, source, target)}
+    val mergeCommands = mapping.toList.map { case (target, source) => MergeTreesCmd(skeleton.id, source, target) }
+    val resumePersistCmd = ResumeEventPersistence(skeleton.id)
 
-    retrieveUnderlyingCmdResult(initCommand :: treeCreateCommands ::: mergeCommands)
-    .map( _ => ContentReference(SkeletonTracing.contentType, skeleton.id))
+    logger.info("Started to initialize tracing actor. ID: " + skeleton.id)
+    retrieveUnderlyingCmdResult(
+      stopPersistCmd :: initCommand :: treeCreateCommands ::: mergeCommands ::: resumePersistCmd :: Nil)
+    .map(_ => ContentReference.createFor(skeleton))
   }
 
   def createFrom(skeleton: SkeletonTracingInit): Fox[ContentReference] = {
     val skeletonId = BSONObjectID.generate.stringify
     retrieveUnderlyingCmdResult(InitSkeletonCmd(skeletonId, skeleton))
-      .map( _ => ContentReference(SkeletonTracing.contentType, skeletonId))
+    .map(_ => ContentReference(SkeletonTracing.contentType, skeletonId))
   }
 
   def createFrom(dataSet: DataSet)(implicit ctx: DBAccessContext): Fox[ContentReference] =
@@ -97,14 +100,14 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
 
   def archiveById(_skeleton: BSONObjectID)(implicit ctx: DBAccessContext) =
     for {
-      // _ <- UsedAnnotationDAO.removeAll(AnnotationIdentifier(typ, _skeleton.stringify))
+    // _ <- UsedAnnotationDAO.removeAll(AnnotationIdentifier(typ, _skeleton.stringify))
       _ <- retrieveUnderlyingCmdResult(ArchiveCmd(_skeleton.stringify))
     } yield true
 
   def findOneById(tracingId: String)(implicit ctx: DBAccessContext): Fox[SkeletonTracing] = {
-    Logger.error(s"Looking for $tracingId")
-    (underlying ? GetSkeletonQuery(tracingId)).mapTo[SkeletonResponse].map{r => SkeletonTracingTempStore.popEntry(r.retrievalKey)}.toFox.orElse{
-      Logger.warn("USING DB tracing fallback!")
+    logger.info(s"Looking for $tracingId")
+    (underlying ? GetSkeletonQuery(tracingId)).mapTo[SkeletonResponse].map { r => SkeletonTracingTempStore.popEntry(r.retrievalKey) }.toFox.orElse {
+      logger.warn(s"USING DB tracing fallback for $tracingId!")
       DBSkeletonTracingService.findOneById(tracingId).flatMap(s => createFrom(s).map(_ => s))
     }
   }
@@ -129,35 +132,20 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
         Fox.combined(updates.map { updateCmd =>
           retrieveUnderlyingCmdResult(updateCmd)
         }).flatMap(_.headOption) //.flatMap(_ => findOneById(id))
-      case e: JsError =>
-        Logger.warn("Failed to parse all update commands from json. " + JsonUtils.jsError2HumanReadable(e))
+      case e: JsError            =>
+        logger.warn("Failed to parse all update commands from json. " + JsonUtils.jsError2HumanReadable(e))
         Fox.failure(JsonUtils.jsError2HumanReadable(e))
     }
   }
 
+  override def updateSettings(
+    dataSetName: String,
+    boundingBox: Option[BoundingBox],
+    settings: AnnotationSettings,
+    tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean] = {
 
-  def resetComments(_tracing: String)(implicit ctx: DBAccessContext) = ???
-//    update(Json.obj("_id" -> _tracing), Json.obj("$set" -> Json.obj("comments" -> Json.arr())))
-
-  def resetBranchPoints(_tracing: String)(implicit ctx: DBAccessContext) = ???
-//    update(Json.obj("_id" -> _tracing), Json.obj("$set" -> Json.obj("branchPoints" -> Json.arr())))
-
-  def addBranchPoint(_tracing: String, bp: BranchPoint)(implicit ctx: DBAccessContext) = ???
-//    findAndModify(
-//      Json.obj("_id" -> _tracing),
-//      Json.obj("$set" -> Json.obj(
-//        "branchPoints.-1" -> bp)),
-//      returnNew = true)
-
-  def addComment(_tracing: String, comment: Comment)(implicit ctx: DBAccessContext) = ???
-//    findAndModify(
-//      Json.obj("_id" -> _tracing),
-//      Json.obj("$set" -> Json.obj(
-//        "comments.-1" -> comment)),
-//      returnNew = true)
-  override def updateSettings(dataSetName: String, boundingBox: Option[BoundingBox], settings: AnnotationSettings, tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean] = {
-  retrieveUnderlyingCmdResult(UpdateSettingsCmd(tracingId, dataSetName = Some(dataSetName), boundingBox = boundingBox, settings = Some(settings))).map(_ => true)
-}
+    retrieveUnderlyingCmdResult(UpdateSettingsCmd(tracingId, dataSetName = Some(dataSetName), boundingBox = boundingBox, settings = Some(settings))).map(_ => true)
+  }
 
   override def updateSettings(settings: AnnotationSettings, tracingId: String)(implicit ctx: DBAccessContext): Fox[Boolean] = {
     retrieveUnderlyingCmdResult(UpdateSettingsCmd(tracingId, settings = Some(settings))).map(_ => true)

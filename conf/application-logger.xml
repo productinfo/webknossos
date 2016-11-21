@@ -22,6 +22,7 @@
   <logger name="application" level="TRACE" />
   <logger name="braingames.binary" level="TRACE" />
   <logger name="oxalis" level="INFO" />
+  <logger name="akka" level="INFO" />
 
   <root level="INFO">
     <appender-ref ref="STDOUT" />

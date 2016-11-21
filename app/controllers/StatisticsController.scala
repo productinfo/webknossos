@@ -58,7 +58,6 @@ class StatisticsController @Inject()(val messagesApi: MessagesApi)
           numberOfUsers <- UserService.countNonAnonymousUsers
           numberOfDatasets <- DataSetDAO.count(Json.obj())
           numberOfAnnotations <- AnnotationDAO.countAll
-          numberOfTrees <- Fox.successful(-1) // TODO: Reimplement tree counter (send msg from actor to actor that counts the trees)
           numberOfAssignments <- OpenAssignmentService.countOpenAssignments
         } yield {
           Ok(Json.obj(
@@ -67,7 +66,6 @@ class StatisticsController @Inject()(val messagesApi: MessagesApi)
             "numberOfUsers" -> numberOfUsers,
             "numberOfDatasets" -> numberOfDatasets,
             "numberOfAnnotations" -> numberOfAnnotations,
-            "numberOfTrees" -> numberOfTrees,
             "numberOfOpenAssignments" -> numberOfAssignments
           ))
         }

@@ -15,6 +15,10 @@ sealed trait SkeletonMsg extends Serializable {
 
 sealed trait SkeletonCmd extends SkeletonMsg
 
+case class StopEventPersistence(skeletonId: String) extends SkeletonCmd
+
+case class ResumeEventPersistence(skeletonId: String) extends SkeletonCmd
+
 case class InitSkeletonCmd(skeletonId: String, initialParams: SkeletonTracingInit) extends SkeletonCmd
 
 case class CreateNodeCmd(skeletonId: String, treeId: Int, node: Node) extends SkeletonCmd

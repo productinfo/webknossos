@@ -24,6 +24,7 @@ case class TemporaryAnnotation(
                                 id: String,
                                 _user: Option[BSONObjectID],
                                 _content: () => Fox[AnnotationContent],
+                                contentReference: ContentReference,
                                 _task: Option[BSONObjectID] = None,
                                 team: String,
                                 relativeDownloadUrl: Option[String],
@@ -57,9 +58,9 @@ case class TemporaryAnnotation(
   def saveToDB(implicit ctx: DBAccessContext): Fox[Annotation] = {
     for{
       c <- content
-      savedContent <- c.saveToDB
+      contentReference <- c.saveToDB
       annotationId = BSONObjectID.parse(id).getOrElse(BSONObjectID.generate)
-      annotation <- AnnotationService.createFrom(this, savedContent, annotationId)
+      annotation <- AnnotationService.createFrom(this, contentReference, annotationId)
     } yield annotation
   }
 }
@@ -67,7 +68,7 @@ case class TemporaryAnnotation(
 object TemporaryAnnotationService {
   def createFrom(a: Annotation, id: String, _content: AnnotationContent): TemporaryAnnotation = {
     val content = () => Fox.successful(_content)
-    TemporaryAnnotation(id, a._user, content, a._task, a.team, a.relativeDownloadUrl, a.state, a.typ, a._name, a.restrictions, a.version, a.created)
+    TemporaryAnnotation(id, a._user, content, a._content, a._task, a.team, a.relativeDownloadUrl, a.state, a.typ, a._name, a.restrictions, a.version, a.created)
   }
 }
 

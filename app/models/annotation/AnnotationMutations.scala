@@ -94,7 +94,7 @@ class AnnotationMutations(val annotation: Annotation)
     AnnotationDAO.incrementVersion(annotation._id)
 
   def resetToBase()(implicit ctx: DBAccessContext) = {
-    def resetContent(): Fox[AnnotationContent] ={
+    def resetContent(): Fox[ContentReference] ={
       annotation.typ match {
         case AnnotationType.Explorational =>
           Fox.failure("annotation.revert.skeletonOnly")
@@ -109,16 +109,18 @@ class AnnotationMutations(val annotation: Annotation)
       }
     }
 
+    val oldContentReference = annotation.contentReference
+
     for {
-      oldAnnotationContent <- annotation.content
-      reset <- resetContent()
-      _ <- oldAnnotationContent.service.clearAndRemove(oldAnnotationContent.id)
-      updatedAnnotation <- AnnotationDAO.updateContent(annotation._id, ContentReference.createFor(reset))
+      resetReference <- resetContent()
+      _ <- oldContentReference.service.clearAndRemove(oldContentReference._id)
+      updatedAnnotation <- AnnotationDAO.updateContent(annotation._id, resetReference)
     } yield updatedAnnotation
   }
 
   def updateFromJson(js: JsValue)(implicit ctx: DBAccessContext) = {
-    annotation.content.flatMap(el => el.service.updateFromJson(el.id, js)).flatMap(_ =>
+    val contentReference = annotation.contentReference
+    contentReference.service.updateFromJson(contentReference._id, js).flatMap(_ =>
       AnnotationDAO.incrementVersion(annotation._id))
   }
 

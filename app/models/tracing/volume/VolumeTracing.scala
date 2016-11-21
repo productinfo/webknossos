@@ -53,8 +53,6 @@ case class VolumeTracing(
 
   type Self = VolumeTracing
 
-  def service = VolumeTracingService
-
   def temporaryDuplicate(id: String)(implicit ctx: DBAccessContext) = {
     // TODO: implement
     Fox.failure("Not yet implemented")
@@ -66,7 +64,9 @@ case class VolumeTracing(
   }
 
   def saveToDB(implicit ctx: DBAccessContext) = {
-    VolumeTracingService.saveToDB(this)
+    VolumeTracingService.saveToDB(this).map{ v =>
+      ContentReference.createFor(v)
+    }
   }
 
   def contentType: String = VolumeTracing.contentType
@@ -107,15 +107,13 @@ case class VolumeTracing(
         ZipIO.zip(
           List(
             new NamedEnumeratorStream(inputStream, "data.zip"),
-            new NamedEnumeratorStream(volumeNml, name + ".nml")
+            new NamedEnumeratorStream(volumeNml, name + NML.FileExtension)
           ), outputStream)
       }
     }
   }
 
-  def downloadFileExtension: String = ".zip"
-
-  override def contentData = {
+  def contentData = {
     UserDataLayerDAO.findOneByName(userDataLayerName)(GlobalAccessContext).map { userDataLayer =>
       Json.obj(
         "activeCell" -> activeCellId,
@@ -131,6 +129,8 @@ object VolumeTracingService extends AnnotationContentService with CommonTracingS
   type AType = VolumeTracing
 
   def dao = VolumeTracingDAO
+
+  def downloadFileExtension: String = ".zip"
 
   def updateFromJson(id: String, json: JsValue)(implicit ctx: DBAccessContext): Fox[Boolean] = {
     json match {
@@ -161,7 +161,7 @@ object VolumeTracingService extends AnnotationContentService with CommonTracingS
       _ <- UserDataLayerDAO.insert(dataLayer)
       _ <- VolumeTracingDAO.insert(volumeTracing)
     } yield {
-      ContentReference(VolumeTracing.contentType, volumeTracing.id)
+      ContentReference.createFor(volumeTracing)
     }
   }
 

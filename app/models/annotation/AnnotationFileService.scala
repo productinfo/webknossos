@@ -22,10 +22,8 @@ trait AnnotationFileService extends FoxImplicits {
 
   val conf = Play.current.configuration
 
-  val defaultDownloadExtension = ".txt"
-
   def fileExtension(annotation: Annotation) =
-    annotation.content.map(_.downloadFileExtension) getOrElse defaultDownloadExtension
+    annotation.contentReference.service.downloadFileExtension
 
   val annotationStorageFolder = {
     val folder = conf.getString("oxalis.annotation.storageFolder") getOrElse "data/nmls"
@@ -33,14 +31,14 @@ trait AnnotationFileService extends FoxImplicits {
     folder
   }
 
-  def outputPathForAnnotation() = fileExtension(annotation).map{ ext =>
-    s"$annotationStorageFolder/${annotation.id}$ext"
+  def outputPathForAnnotation() = {
+    s"$annotationStorageFolder/${annotation.id}${fileExtension(annotation)}"
   }
 
   def writeAnnotationToFile(): Fox[Boolean] = {
     for {
       in: InputStream <- annotationToInputStream()
-      path <- outputPathForAnnotation()
+      path = outputPathForAnnotation()
     } yield {
       val f = new File(path)
       val out = new FileOutputStream(f).getChannel
@@ -58,13 +56,12 @@ trait AnnotationFileService extends FoxImplicits {
 
   def loadAnnotationContentFromFileStream(): Fox[InputStream] = {
     if (annotation.state.isFinished) {
-      outputPathForAnnotation().map{ path =>
-        val f = new File(path)
-        if (f.exists())
-          Some(new FileInputStream(f))
-        else
-          None
-      }
+      val path = outputPathForAnnotation()
+      val f = new File(path)
+      if (f.exists())
+        Some(new FileInputStream(f))
+      else
+        None
     } else
       None
   }
@@ -82,7 +79,7 @@ trait AnnotationFileService extends FoxImplicits {
       annotationStream <- loadAnnotationContentStream()
       name <- SavedTracingInformationHandler.nameForAnnotation(annotation)
     } yield
-      NamedFileStream( () => annotationStream, name + ".nml")
+      NamedFileStream( () => annotationStream, name + fileExtension(annotation))
   }
 
   def annotationToInputStream(): Fox[InputStream] = {

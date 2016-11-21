@@ -7,32 +7,36 @@ import java.util.UUID
 
 import scala.concurrent.duration._
 
-import akka.actor.Props
+import akka.actor.{PoisonPill, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion
+import akka.cluster.sharding.ShardRegion.Passivate
 import akka.event.LoggingReceive
-import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
+import akka.persistence._
 import com.scalableminds.util.geometry.BoundingBox
 import com.typesafe.scalalogging.LazyLogging
 import models.tracing.skeleton.SkeletonTracing
-import oxalis.actor.{ALogging, Passivation}
+import oxalis.actor.ALogging
 import oxalis.nml._
 
 object SkeletonTracingProcessor extends LazyLogging {
 
   def props: Props = Props(new SkeletonTracingProcessor)
 
-  val idExtractor: ShardRegion.ExtractEntityId = new PartialFunction[ShardRegion.Msg, (ShardRegion.EntityId, ShardRegion.Msg)] {
-    override def isDefinedAt(x: ShardRegion.Msg): Boolean = x match {
-      case m: SkeletonMsg => true
-      case m              => logger.error(s"Shard '$shardName' received invalid msg type: " + m); false
-    }
+  val idExtractor: ShardRegion.ExtractEntityId =
+    new PartialFunction[ShardRegion.Msg, (ShardRegion.EntityId, ShardRegion.Msg)] {
+      override def isDefinedAt(x: ShardRegion.Msg): Boolean = x match {
+        case m: SkeletonMsg => true
+        case m              => logger.error(s"Shard '$shardName' received invalid msg type: " + m); false
+      }
 
-    override def apply(v1: ShardRegion.Msg) = v1 match {
-      case m: SkeletonMsg => (m.skeletonId, m)
+      override def apply(v1: ShardRegion.Msg) = v1 match {
+        case m: SkeletonMsg => (m.skeletonId, m)
+      }
     }
-  }
 
   val numberOfShards = 10
+
+  val maxCmdsBetweenSnapshots = 500
 
   val shardResolver: ShardRegion.ExtractShardId = {
     case m: SkeletonMsg => (math.abs(m.skeletonId.hashCode) % numberOfShards).toString
@@ -43,11 +47,15 @@ object SkeletonTracingProcessor extends LazyLogging {
   def inactivityTimeout = 1.minute
 }
 
-class SkeletonTracingProcessor extends PersistentActor with Passivation with ALogging with LazyLogging{
+class SkeletonTracingProcessor extends PersistentActor with ALogging with LazyLogging {
 
-  logger.warn("SKELETON TRACING PROCESSOR STARTED! NAME: " + self.path.name)
+  logger.info(s"Started skeleton processor for [${self.path.name}]. LSN: " + lastSequenceNr)
 
   var state: Option[SkeletonTracing] = None
+
+  var shouldSaveEvents = true
+
+  var stateChangedSinceLastSnapshot = false
 
   /** passivate the entity when no activity for 1 minute */
   context.setReceiveTimeout(SkeletonTracingProcessor.inactivityTimeout)
@@ -133,6 +141,18 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
 
   def initialBehaviour = passivate(uninitialized.orElse(queries)).orElse(defaultCommands)
 
+  protected def passivate(receive: Receive): Receive = receive.orElse {
+    case ReceiveTimeout =>
+      // tell parent actor to send us a poison pill
+      logger.info(s" $self ReceiveTimeout: passivating. ")
+      storeSnapshotIfChanged()
+      context.parent ! Passivate(stopMessage = PoisonPill)
+
+    case PoisonPill =>
+      // stop
+      context.stop(self)
+  }
+
   def uninitialized: Receive = LoggingReceive.withLabel("unintialzed") {
 
     case InitSkeletonCmd(id, initParams) =>
@@ -144,20 +164,34 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
       updateBehaviour(traceableSkeleton)
   }
 
+  def storeSnapshotIfChanged() = {
+    if (stateChangedSinceLastSnapshot) {
+      state.foreach(s => saveSnapshot(s))
+      stateChangedSinceLastSnapshot = false
+    }
+  }
+
   def updateStateAndNotifySender(skeletonId: String, evt: SkeletonEvt) = {
     state = updateState(evt, state)
+    stateChangedSinceLastSnapshot = true
+
+    if (shouldSaveEvents && lastSequenceNr % SkeletonTracingProcessor.maxCmdsBetweenSnapshots == 0) {
+      storeSnapshotIfChanged()
+    }
+
     sender() ! ValidUpdateAck(skeletonId)
   }
 
   def handleCmd(cmd: SkeletonCmd, isValid: => Boolean, eventBuilder: => List[SkeletonEvt], errorMsgIfInvalid: String) = {
-    if (!isValid)
+    if (!isValid) {
       sender() ! InvalidUpdateAck(cmd.skeletonId, errorMsgIfInvalid)
-    else {
+    } else if (shouldSaveEvents) {
       persistAll(eventBuilder) { evt =>
         updateStateAndNotifySender(cmd.skeletonId, evt)
       }
+    } else {
+      eventBuilder.foreach(evt => updateStateAndNotifySender(cmd.skeletonId, evt))
     }
-
   }
 
   def traceableSkeleton: Receive = LoggingReceive.withLabel("traceable") {
@@ -203,12 +237,18 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
 
     case cmd: UpdateMetadataCmd =>
       val events = state.map { tracing =>
-        EditViewUpdatedEvt(
+        val nodeUpdateEvt = if (tracing.activeNodeId != cmd.activeNode)
+                              List(ActiveNodeUpdatedEvt(cmd.skeletonId, cmd.activeNode))
+                            else
+                              Nil
+
+        val viewUpdateEvt = EditViewUpdatedEvt(
           cmd.skeletonId,
           cmd.editPosition getOrElse tracing.editPosition,
           cmd.editRotation getOrElse tracing.editRotation,
-          cmd.zoomLevel getOrElse tracing.zoomLevel) ::
-          (if (tracing.activeNodeId != cmd.activeNode) List(ActiveNodeUpdatedEvt(cmd.skeletonId, cmd.activeNode)) else Nil)
+          cmd.zoomLevel getOrElse tracing.zoomLevel)
+
+        viewUpdateEvt :: nodeUpdateEvt
       } getOrElse Nil
 
       handleCmd(
@@ -219,6 +259,7 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
       )
 
     case cmd: CreateTreeCmd =>
+      logger.warn("CREATE TREE. TID: " + cmd.tree.id)
       handleCmd(
         cmd,
         isValid = state.exists(_.tree(cmd.tree.id).isEmpty),
@@ -228,7 +269,9 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
 
     case cmd: UpdateTreePropertiesCmd =>
       val event = state.flatMap(_.tree(cmd.treeId)).map { tree =>
-        TreePropertiesUpdatedEvt(cmd.skeletonId, tree.id, cmd.updatedId getOrElse tree.id, cmd.color, cmd.name, cmd.branchPoints, cmd.comments)
+        val updatedTreeId = cmd.updatedId getOrElse tree.id
+        TreePropertiesUpdatedEvt(
+          cmd.skeletonId, tree.id, updatedTreeId, cmd.color, cmd.name, cmd.branchPoints, cmd.comments)
       }
 
       handleCmd(
@@ -239,6 +282,7 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
       )
 
     case cmd: MergeTreesCmd =>
+      logger.warn("MERGING TREES. last: " + lastSequenceNr)
       handleCmd(
         cmd,
         isValid = state.exists(s => s.tree(cmd.sourceTreeId).isDefined && s.tree(cmd.targetTreeId).isDefined),
@@ -289,7 +333,10 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
       val events = List(
         cmd.settings.map(s => UpdatedAnnotationSettingsEvt(cmd.skeletonId, s)),
         cmd.dataSetName.map(dsn => UpdatedDataSetEvt(cmd.skeletonId, dsn)),
-        if (cmd.boundingBox != state.flatMap(_.boundingBox)) Some(UpdatedBoundingBoxEvt(cmd.skeletonId, cmd.boundingBox)) else None
+        if (cmd.boundingBox != state.flatMap(_.boundingBox))
+          Some(UpdatedBoundingBoxEvt(cmd.skeletonId, cmd.boundingBox))
+        else
+          None
       ).flatten
 
       handleCmd(
@@ -309,7 +356,6 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
     */
   def postRecoveryBecome(skeletonRecoverStateMaybe: Option[SkeletonTracing]): Unit =
     skeletonRecoverStateMaybe.foreach { skeletonState =>
-      log.info("postRecoveryBecome")
       state = Some(skeletonState)
       if (skeletonState.isArchived) {
         updateBehaviour(archivedSkeleton)
@@ -331,35 +377,59 @@ class SkeletonTracingProcessor extends PersistentActor with Passivation with ALo
   }
 
   def defaultCommands: Receive = LoggingReceive.withLabel("default") {
-    case other => {
+    case cmd: StopEventPersistence =>
+      logger.warn("Stopped event persistence. Id: " + cmd.skeletonId)
+      shouldSaveEvents = false
+      sender ! ValidUpdateAck(cmd.skeletonId)
+
+    case cmd: ResumeEventPersistence =>
+      logger.warn("Resumed event persistence. Id: " + cmd.skeletonId)
+      shouldSaveEvents = true
+      storeSnapshotIfChanged()
+      sender ! ValidUpdateAck(cmd.skeletonId)
+
+    case m: SaveSnapshotSuccess =>
+      logger.debug(s"Successfully stored snapshot [${m.metadata.persistenceId}]")
+
+    case m: SaveSnapshotFailure =>
+      logger.error(s"Failed to store snapshot [${m.metadata.persistenceId}]. Cause: " + m.cause.getMessage, m.cause)
+
+    case other =>
       logger.warn("unknownCommand:  " + other.toString + " ID: " + self.path.toString)
       sender() ! InvalidCmdAck("", "InvalidSkeletonAck")
-    }
   }
 
   /** Used only for recovery */
   private var skeletonRecoverStateMaybe: Option[SkeletonTracing] = None
 
-  def receiveRecover: Receive = LoggingReceive {
+  def receiveRecover: Receive = {
     case WholeTracingChangedEvt(id, skeleton) =>
-      logger.warn("GOT WHOLE TRACING CHANGED EVT")
       skeletonRecoverStateMaybe =
         Some(skeleton)
 
     case evt: SkeletonEvt =>
-      logger.warn("GOT SKELETON EVENT")
+      logger.info(s"Replaying evt [${evt.skeletonId}]. LSN: " + lastSequenceNr)
       skeletonRecoverStateMaybe =
-        updateState(evt.logInfo("receiveRecover evt:" + _.toString), skeletonRecoverStateMaybe)
+        updateState(evt, skeletonRecoverStateMaybe)
 
     case RecoveryCompleted =>
-      logger.warn("RECOVERY COMPLETED! persistence id: " + persistenceId)
+      logger.info("Recovery completed.")
       postRecoveryBecome(skeletonRecoverStateMaybe)
 
     // if snapshots are implemented, currently the aren't.
     case SnapshotOffer(_, snapshot: SkeletonTracing) =>
+      logger.info("Snapshot offer: " + snapshot.id)
       skeletonRecoverStateMaybe = Some(snapshot)
-
-    case msg =>
-      logger.warn("GOT UNRECOGNIZED MESSAGE: " + msg)
   }
+
+  override def onRecoveryFailure(cause: Throwable, event: Option[Any]): Unit =
+    event match {
+      case Some(evt) ⇒
+        logger.error(s"Exception in receiveRecover when replaying event " +
+          s"type ${evt.getClass.getName} with sequence number [$lastSequenceNr] for " +
+          "persistenceId [$persistenceId].", cause)
+      case None      ⇒
+        logger.error(s"Persistence failure when replaying events for persistenceId [$persistenceId]. " +
+          s"Last known sequence number [$lastSequenceNr]")
+    }
 }

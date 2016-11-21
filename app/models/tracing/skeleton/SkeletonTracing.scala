@@ -5,7 +5,7 @@ import com.scalableminds.util.image.Color
 import com.scalableminds.util.reactivemongo.{DBAccessContext, GlobalDBAccess}
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import com.scalableminds.util.xml.{XMLWrites, Xml}
-import models.annotation.{AnnotationContent, AnnotationSettings}
+import models.annotation.{AnnotationContent, AnnotationSettings, ContentReference}
 import models.binary.DataSetService
 import models.tracing.skeleton.persistence.SkeletonTracingService
 import org.apache.commons.io.IOUtils
@@ -47,9 +47,6 @@ case class SkeletonTracing(
 
     Some(SkeletonTracingStatistics(numberOfNodes, numberOfEdges, numberOfTrees))
   }
-
-  def service =
-    SkeletonTracingService
 
   def allowAllModes =
     this.copy(settings = settings.copy(allowedModes = AnnotationSettings.SKELETON_MODES))
@@ -202,22 +199,21 @@ case class SkeletonTracing(
     }
   }
 
-  // TODO: remove?
   override def temporaryDuplicate(id: String)(implicit ctx: DBAccessContext): Fox[AnnotationContent] = {
     Fox.successful(this.copy(id = id))
   }
 
-  // TODO: remove?
-  override def saveToDB(implicit ctx: DBAccessContext): Fox[AnnotationContent] = ???
+  override def saveToDB(implicit ctx: DBAccessContext): Fox[ContentReference] = {
+    SkeletonTracingService.createFrom(this)
+  }
 
   def contentType = SkeletonTracing.contentType
 
-  def downloadFileExtension = ".nml"
-
   def toDownloadStream(name: String)(implicit ctx: DBAccessContext): Fox[Enumerator[Array[Byte]]] =
-    NMLService.toNML(this).map(data => Enumerator.fromStream(IOUtils.toInputStream(data)))
+    NMLService.toNML(this)(SkeletonTracing.SkeletonTracingXMLWrites)
+    .map(data => Enumerator.fromStream(IOUtils.toInputStream(data)))
 
-  override def contentData =
+  def contentData =
     SkeletonTracing.skeletonTracingLikeWrites(this)
 }
 
@@ -284,10 +280,6 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
     }.toFox
   }
 
-  def createFrom(tracing: SkeletonTracing, id: String)(implicit ctx: DBAccessContext) = {
-    tracing.copy(id = id)
-  }
-
   def createFrom(
     nmls: List[NML],
     boundingBox: Option[BoundingBox],
@@ -304,7 +296,7 @@ object SkeletonTracing extends SkeletonTracingWrites with FoxImplicits {
 
     nmls match {
       case nml :: tail =>
-        val startTracing = createFrom(renameTrees(nml), nml.timestamp.toString, boundingBox, settings)
+        val startTracing = createFrom(renameTrees(nml), BSONObjectID.generate().stringify, boundingBox, settings)
 
         tail.foldLeft(startTracing) {
           case (f, s) =>

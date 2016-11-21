@@ -35,6 +35,8 @@ trait AnnotationContentService {
   def createFrom(dataSet: DataSet)(implicit ctx: DBAccessContext): Fox[ContentReference]
 
   def clearAndRemove(id: String)(implicit ctx: DBAccessContext): Fox[ContentReference]
+
+  def downloadFileExtension: String
 }
 
 trait AnnotationContentProviders {

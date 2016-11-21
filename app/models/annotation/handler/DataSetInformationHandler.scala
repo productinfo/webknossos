@@ -4,10 +4,10 @@ import scala.concurrent.Future
 
 import com.scalableminds.util.reactivemongo.DBAccessContext
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
-import models.annotation.{AnnotationRestrictions, AnnotationType, TemporaryAnnotation}
-import models.binary.DataSetDAO
+import models.annotation._
 import models.tracing.skeleton.SkeletonTracing
 import models.annotation.{AnnotationRestrictions, AnnotationType, TemporaryAnnotation}
+import models.binary.DataSetDAO
 import models.user.User
 import play.api.libs.concurrent.Execution.Implicits._
 import reactivemongo.bson.BSONObjectID
@@ -50,6 +50,7 @@ object DataSetInformationHandler extends AnnotationInformationHandler with FoxIm
         dataSetName,
         user.map(_._id),
         () => Future.successful(Some(content)),
+        ContentReference.createFor(content),
         None,
         team,
         None,

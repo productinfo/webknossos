@@ -78,12 +78,13 @@ class AnnotationIOController @Inject()(val messagesApi: MessagesApi) extends Con
           annotationDAO <- AnnotationDAO.findOneById(id) ?~> Messages("annotation.notFound")
           content <- annotation.content ?~> Messages("annotation.content.empty")
           stream <- content.toDownloadStream(name)
+          fileExtension = annotation.contentReference.service.downloadFileExtension
         } yield {
           Ok.chunked(stream.andThen(Enumerator.eof[Array[Byte]])).withHeaders(
             CONTENT_TYPE ->
               "application/octet-stream",
             CONTENT_DISPOSITION ->
-              s"filename=${'"'}${name + content.downloadFileExtension}${'"'}")
+              s"filename=${'"'}${name + fileExtension}${'"'}")
         }
     }
   }

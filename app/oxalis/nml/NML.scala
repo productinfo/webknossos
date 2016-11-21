@@ -14,3 +14,7 @@ case class NML(
   editRotation: Option[Vector3D],
   zoomLevel: Option[Double]
 )
+
+object NML {
+  val FileExtension = ".nml"
+}

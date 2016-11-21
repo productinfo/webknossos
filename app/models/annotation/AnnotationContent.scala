@@ -1,7 +1,5 @@
 package models.annotation
 
-import java.util.Date
-
 import scala.xml.NodeSeq
 
 import com.scalableminds.braingames.binary.models.{DataLayer, DataLayerMapping, FallbackLayer}
@@ -16,8 +14,6 @@ import play.api.libs.json._
 
 trait AnnotationContent {
   type Self <: AnnotationContent
-
-  def service: AnnotationContentService
 
   def id: String
 
@@ -37,7 +33,7 @@ trait AnnotationContent {
 
   def temporaryDuplicate(id: String)(implicit ctx: DBAccessContext): Fox[AnnotationContent]
 
-  def saveToDB(implicit ctx: DBAccessContext): Fox[AnnotationContent]
+  def saveToDB(implicit ctx: DBAccessContext): Fox[ContentReference]
 
   def mergeWith(source: AnnotationContent, settings: Option[AnnotationSettings])(implicit ctx: DBAccessContext): Fox[AnnotationContent]
 
@@ -45,13 +41,7 @@ trait AnnotationContent {
 
   def toDownloadStream(name: String)(implicit ctx: DBAccessContext): Fox[Enumerator[Array[Byte]]]
 
-  def downloadFileExtension: String
-
-  def contentData: Fox[JsObject] = Fox.empty
-
-  lazy val date = new Date(timestamp)
-
-  def dataSet(implicit ctx: DBAccessContext): Fox[DataSet] = DataSetDAO.findOneBySourceName(dataSetName)
+  def contentData: Fox[JsObject]
 }
 
 object AnnotationContent extends FoxImplicits {
@@ -77,7 +67,7 @@ object AnnotationContent extends FoxImplicits {
 
   def writeAsJson(ac: AnnotationContent)(implicit ctx: DBAccessContext) = {
     for {
-      dataSet <- ac.dataSet.futureBox
+      dataSet <- DataSetDAO.findOneBySourceName(ac.dataSetName).futureBox
       contentData <- ac.contentData getOrElse Json.obj()
     } yield {
       Json.obj(

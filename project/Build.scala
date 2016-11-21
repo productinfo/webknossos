@@ -31,7 +31,6 @@ object Dependencies{
   val akkaPersistence = "com.typesafe.akka" %% "akka-persistence" % akkaVersion
   val akkaCluster = "com.typesafe.akka" %% "akka-cluster" % akkaVersion
   val akkaClusterShard = "com.typesafe.akka" %% "akka-cluster-sharding" % akkaVersion
-  val akkaPersistenceCassandra = "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.14"
   val twitterChillSerialization = "com.twitter" %% "chill" % twitterChillVersion
   val twitterChillAkkaSerialization = "com.twitter" %% "chill-akka" % twitterChillVersion
   val jerseyClient = "com.sun.jersey" % "jersey-client" % "1.8"
@@ -45,7 +44,8 @@ object Dependencies{
   val airbrake = "com.scalableminds" %% "play-airbrake" % "0.5.0"
   val mongev = "com.scalableminds" %% "play-mongev" % "0.4.1"
   val urlHelper = "com.netaporter" %% "scala-uri" % "0.4.14"
-  val rxmongoakka = "com.github.scullxbones" %% "akka-persistence-mongo-rxmongo" % "1.3.6"
+  val casbahAkka = "com.github.scullxbones" %% "akka-persistence-mongo-casbah" % "1.3.6"
+  val casbah = "org.mongodb" %% "casbah" % "3.1.1"
 
   // Unfortunately, we need to list all mturk dependencies seperately since mturk is not published on maven but rather
   // added to the project as a JAR. To keep the number of JARs added to this repo as small as possible, everthing that
@@ -215,7 +215,8 @@ object ApplicationBuild extends Build {
     akkaPersistence,
     akkaCluster,
     akkaClusterShard,
-    rxmongoakka,
+    casbahAkka,
+    casbah,
     twitterChillSerialization,
     twitterChillAkkaSerialization,
     jerseyClient,

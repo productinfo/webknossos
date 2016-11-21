@@ -152,9 +152,9 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
   def updateAnnotationBase(task: Task, start: Point3D, rotation: Vector3D)(implicit ctx: DBAccessContext) = {
     for {
       base <- task.annotationBase
-      content <- base.content
+      contentReference = base.contentReference
     } yield {
-      content.service.updateEditPosRot(start, rotation, content.id)
+      contentReference.service.updateEditPosRot(start, rotation, contentReference._id)
     }
   }
 
@@ -173,10 +173,10 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     }
   }
 
-  def createFrom(temporary: TemporaryAnnotation, content: AnnotationContent, id: BSONObjectID)(implicit ctx: DBAccessContext) = {
+  def createFrom(temporary: TemporaryAnnotation, contentReference: ContentReference, id: BSONObjectID)(implicit ctx: DBAccessContext) = {
     val annotation = Annotation(
       temporary._user,
-      ContentReference.createFor(content),
+      contentReference,
       temporary._task,
       temporary.team,
       temporary.state,

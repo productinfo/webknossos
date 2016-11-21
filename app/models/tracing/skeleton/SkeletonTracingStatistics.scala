@@ -41,7 +41,7 @@ case class SkeletonTracingStatistics(
 
   def createEdge = Future.successful(this.copy(numberOfEdges = this.numberOfEdges + 1))
 
-  def deleteEdge = Future.successful(this.copy(numberOfEdges = this.numberOfEdges + 1))
+  def deleteEdge = Future.successful(this.copy(numberOfEdges = this.numberOfEdges - 1))
 }
 
 object SkeletonTracingStatistics {

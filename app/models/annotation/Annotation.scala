@@ -48,6 +48,8 @@ case class Annotation(
 
   def content = _content.resolveAs[AnnotationContent](GlobalAccessContext).toFox
 
+  def contentReference = _content
+
   val contentType = _content.contentType
 
   val restrictions = if(readOnly.getOrElse(false))
@@ -272,7 +274,7 @@ object AnnotationDAO
     find(
       Json.obj(
         "_task" -> task._id)).cursor[Annotation]().collect[List]().map(_.map { annotation =>
-      annotation._content.service.updateSettings(settings, annotation._content._id)
+      annotation.contentReference.service.updateSettings(settings, annotation._content._id)
     })
   }
   def updateAllOfTask(
@@ -284,7 +286,7 @@ object AnnotationDAO
     find(
       Json.obj(
         "_task" -> task._id)).cursor[Annotation]().collect[List]().map(_.map{ annotation =>
-          annotation._content.service.updateSettings(dataSetName, boundingBox, settings, annotation._content._id)
+          annotation.contentReference.service.updateSettings(dataSetName, boundingBox, settings, annotation._content._id)
     })
   }
 
