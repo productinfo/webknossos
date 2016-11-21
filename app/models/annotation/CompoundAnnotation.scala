@@ -121,6 +121,7 @@ object CompoundAnnotation extends Formatter with FoxImplicits {
         annotations.head.contentReference.copy(_id = id),
         None,
         team,
+        annotations.head.dataSetName,
         downloadUrl,
         state,
         typ,

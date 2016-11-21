@@ -15,24 +15,25 @@ import org.joda.time.format.DateTimeFormat
 import oxalis.view.{ResourceAction, ResourceActionCollection}
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
-import reactivemongo.play.json.BSONFormats._
 import reactivemongo.api.indexes.{Index, IndexType}
 import reactivemongo.bson.BSONObjectID
+import reactivemongo.play.json.BSONFormats._
 
 case class Annotation(
-                       _user: Option[BSONObjectID],
-                       _content: ContentReference,
-                       _task: Option[BSONObjectID] = None,
-                       team: String,
-                       state: AnnotationState = AnnotationState.InProgress,
-                       typ: String = AnnotationType.Explorational,
-                       version: Int = 0,
-                       _name: Option[String] = None,
-                       created : Long = System.currentTimeMillis,
-                       _id: BSONObjectID = BSONObjectID.generate,
-                       isActive: Boolean = true,
-                       readOnly: Option[Boolean] = None
-                     )
+  _user: Option[BSONObjectID],
+  _content: ContentReference,
+  team: String,
+  dataSetName: String,
+  _task: Option[BSONObjectID] = None,
+  state: AnnotationState = AnnotationState.InProgress,
+  typ: String = AnnotationType.Explorational,
+  version: Int = 0,
+  _name: Option[String] = None,
+  created: Long = System.currentTimeMillis,
+  _id: BSONObjectID = BSONObjectID.generate,
+  isActive: Boolean = true,
+  readOnly: Option[Boolean] = None
+)
 
   extends AnnotationLike with FoxImplicits {
 
@@ -41,8 +42,8 @@ case class Annotation(
   lazy val muta = new AnnotationMutations(this)
 
   /**
-   * Easy access methods
-   */
+    * Easy access methods
+    */
 
   val name = _name getOrElse ""
 
@@ -52,10 +53,10 @@ case class Annotation(
 
   val contentType = _content.contentType
 
-  val restrictions = if(readOnly.getOrElse(false))
-      AnnotationRestrictions.readonlyAnnotation()
-    else
-      AnnotationRestrictions.defaultAnnotationRestrictions(this)
+  val restrictions = if (readOnly.getOrElse(false))
+                       AnnotationRestrictions.readonlyAnnotation()
+                     else
+                       AnnotationRestrictions.defaultAnnotationRestrictions(this)
 
   def relativeDownloadUrl = Some(Annotation.relativeDownloadUrlOf(typ, id))
 
@@ -64,12 +65,12 @@ case class Annotation(
   }
 
   def temporaryDuplicate(keepId: Boolean)(implicit ctx: DBAccessContext) = {
-    for{
-      contentDuplicate <- content.flatMap(c => c.temporaryDuplicate(if(keepId) c.id else BSONObjectID.generate.stringify))
+    for {
+      contentDuplicate <- content.flatMap(c => c.temporaryDuplicate(if (keepId) c.id else BSONObjectID.generate.stringify))
     } yield {
       TemporaryAnnotationService.createFrom(
         this,
-        if(keepId) this.id else BSONObjectID.generate.stringify,
+        if (keepId) this.id else BSONObjectID.generate.stringify,
         contentDuplicate)
     }
   }
@@ -84,9 +85,9 @@ case class Annotation(
 
   def actions(userOpt: Option[User]) = {
     import controllers.routes._
-    val traceOrView = if(restrictions.allowUpdate(userOpt)) "trace" else "view"
+    val traceOrView = if (restrictions.allowUpdate(userOpt)) "trace" else "view"
     val basicActions = List(
-      ResourceAction(traceOrView, AnnotationController.trace(typ,id), icon = Some("fa fa-random")),
+      ResourceAction(traceOrView, AnnotationController.trace(typ, id), icon = Some("fa fa-random")),
       ResourceAction(ResourceAction.Finish, AnnotationController.finish(typ, id), condition = !state.isFinished, icon = Some("fa fa-check-circle-o"), isAjax = true, clazz = "trace-finish"),
       ResourceAction("reopen", AnnotationController.reopen(typ, id), condition = state.isFinished, icon = Some("fa fa-share"), isAjax = true),
       ResourceAction(ResourceAction.Download, AnnotationIOController.download(typ, id), icon = Some("fa fa-download")),
@@ -105,7 +106,6 @@ object Annotation {
 
   def transformToJson(annotation: Annotation)(implicit ctx: DBAccessContext): Future[JsObject] = {
     for {
-      dataSetName <- annotation.dataSetName
       task <- annotation.task.futureBox
       user <- annotation.user.futureBox
       content <- annotation.content.futureBox
@@ -115,7 +115,7 @@ object Annotation {
       Json.obj(
         "created" -> content.map(annotationContent => DateTimeFormat.forPattern("yyyy-MM-dd HH:mm").print(annotationContent.timestamp)).toOption,
         "contentType" -> contentType,
-        "dataSetName" -> dataSetName,
+        "dataSetName" -> annotation.dataSetName,
         "state" -> annotation.state,
         "typ" -> annotation.typ,
         "name" -> annotation.name,
@@ -131,7 +131,7 @@ object Annotation {
 
 object AnnotationDAO
   extends SecuredBaseDAO[Annotation]
-  with FoxImplicits with MongoHelpers with QuerySupportedDAO[Annotation]{
+    with FoxImplicits with MongoHelpers with QuerySupportedDAO[Annotation] {
 
   val collectionName = "annotations"
 
@@ -152,30 +152,30 @@ object AnnotationDAO
     super.findOne(query ++ Json.obj("isActive" -> true))
   }
 
-  override val AccessDefinitions = new DefaultAccessDefinitions{
+  override val AccessDefinitions = new DefaultAccessDefinitions {
 
     override def findQueryFilter(implicit ctx: DBAccessContext) = {
-      ctx.data match{
+      ctx.data match {
         case Some(user: User) =>
           AllowIf(Json.obj(
             "$or" -> Json.arr(
               Json.obj("team" -> Json.obj("$in" -> user.teamNames)),
-              Json.obj("_user"-> user._id))
+              Json.obj("_user" -> user._id))
           ))
-        case _ =>
+        case _                =>
           DenyEveryone()
       }
     }
 
     override def removeQueryFilter(implicit ctx: DBAccessContext) = {
-      ctx.data match{
+      ctx.data match {
         case Some(user: User) =>
           AllowIf(Json.obj(
             "$or" -> Json.arr(
               Json.obj("team" -> Json.obj("$in" -> user.adminTeamNames)),
-              Json.obj("_user"-> user._id))
-            ))
-        case _ =>
+              Json.obj("_user" -> user._id))
+          ))
+        case _                =>
           DenyEveryone()
       }
     }
@@ -190,29 +190,29 @@ object AnnotationDAO
   def hasAnOpenAnnotation(_user: BSONObjectID, annotationType: AnnotationType)(implicit ctx: DBAccessContext) =
     countOpenAnnotations(_user, annotationType).map(_ > 0)
 
-  def findFor(_user: BSONObjectID, isFinished: Option[Boolean], annotationType: AnnotationType, limit: Int)(implicit ctx: DBAccessContext) = withExceptionCatcher{
+  def findFor(_user: BSONObjectID, isFinished: Option[Boolean], annotationType: AnnotationType, limit: Int)(implicit ctx: DBAccessContext) = withExceptionCatcher {
     var q = Json.obj(
       "_user" -> _user,
       "state.isAssigned" -> true,
       "typ" -> annotationType)
 
-    isFinished.foreach{ f => q += "state.isFinished" -> JsBoolean(f)}
+    isFinished.foreach { f => q += "state.isFinished" -> JsBoolean(f) }
 
     find(q).sort(Json.obj("_id" -> -1)).cursor[Annotation]().collect[List](maxDocs = limit)
   }
 
-  def findForWithTypeOtherThan(_user: BSONObjectID, isFinished: Option[Boolean], annotationTypes: List[AnnotationType], limit: Int)(implicit ctx: DBAccessContext) = withExceptionCatcher{
+  def findForWithTypeOtherThan(_user: BSONObjectID, isFinished: Option[Boolean], annotationTypes: List[AnnotationType], limit: Int)(implicit ctx: DBAccessContext) = withExceptionCatcher {
     var q = Json.obj(
       "_user" -> _user,
       "state.isAssigned" -> true,
       "typ" -> Json.obj("$nin" -> annotationTypes))
 
-    isFinished.foreach{ f => q += "state.isFinished" -> JsBoolean(f)}
+    isFinished.foreach { f => q += "state.isFinished" -> JsBoolean(f) }
 
     find(q).sort(Json.obj("_id" -> -1)).cursor[Annotation]().collect[List](maxDocs = limit)
   }
 
-  def findOpenAnnotationsFor(_user: BSONObjectID, annotationType: AnnotationType)(implicit ctx: DBAccessContext) = withExceptionCatcher{
+  def findOpenAnnotationsFor(_user: BSONObjectID, annotationType: AnnotationType)(implicit ctx: DBAccessContext) = withExceptionCatcher {
     find(defaultFindForUserQ(_user, annotationType)).cursor[Annotation]().collect[List]()
   }
 
@@ -228,7 +228,7 @@ object AnnotationDAO
       Json.obj("$inc" -> Json.obj("version" -> 1)),
       returnNew = true)
 
-  def countByTaskIdAndUser(_user: BSONObjectID, _task: BSONObjectID, annotationType: AnnotationType)(implicit ctx: DBAccessContext) = withExceptionCatcher{
+  def countByTaskIdAndUser(_user: BSONObjectID, _task: BSONObjectID, annotationType: AnnotationType)(implicit ctx: DBAccessContext) = withExceptionCatcher {
     count(Json.obj(
       "_task" -> _task,
       "typ" -> annotationType,
@@ -277,6 +277,7 @@ object AnnotationDAO
       annotation.contentReference.service.updateSettings(settings, annotation._content._id)
     })
   }
+
   def updateAllOfTask(
     task: Task,
     dataSetName: String,
@@ -285,8 +286,8 @@ object AnnotationDAO
 
     find(
       Json.obj(
-        "_task" -> task._id)).cursor[Annotation]().collect[List]().map(_.map{ annotation =>
-          annotation.contentReference.service.updateSettings(dataSetName, boundingBox, settings, annotation._content._id)
+        "_task" -> task._id)).cursor[Annotation]().collect[List]().map(_.map { annotation =>
+      annotation.contentReference.service.updateSettings(dataSetName, boundingBox, settings, annotation._content._id)
     })
   }
 
@@ -328,7 +329,7 @@ object AnnotationDAO
         "_user" -> _user)),
       returnNew = true)
 
-  override def executeUserQuery(q: JsObject, limit: Int)(implicit ctx: DBAccessContext): Fox[List[Annotation]] = withExceptionCatcher{
+  override def executeUserQuery(q: JsObject, limit: Int)(implicit ctx: DBAccessContext): Fox[List[Annotation]] = withExceptionCatcher {
     find(q).cursor[Annotation]().collect[List](maxDocs = limit)
   }
 }

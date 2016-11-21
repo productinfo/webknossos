@@ -61,7 +61,7 @@ trait AnnotationLike extends AnnotationStatistics {
 
   // def incrementVersion: AnnotationLike
 
-  def dataSetName = content.map(_.dataSetName) getOrElse ""
+  def dataSetName: String
 
   def annotationInfo(user: Option[User])(implicit ctx: DBAccessContext): Fox[JsObject] =
     AnnotationLike.annotationLikeInfoWrites(this, user, Nil)

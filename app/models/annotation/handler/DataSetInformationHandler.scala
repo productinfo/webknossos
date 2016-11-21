@@ -53,6 +53,7 @@ object DataSetInformationHandler extends AnnotationInformationHandler with FoxIm
         ContentReference.createFor(content),
         None,
         team,
+        dataSetName,
         None,
         typ = AnnotationType.View,
         restrictions = dataSetRestrictions())

@@ -114,5 +114,5 @@ object TaskService extends TaskAssignmentSimulation with TaskAssignment with Fox
   }
 
   def dataSetNamesForTasks(tasks: List[Task])(implicit ctx: DBAccessContext) =
-    Future.traverse(tasks)(_.annotationBase.flatMap(_.dataSetName getOrElse "").futureBox.map(_.toOption))
+    Future.traverse(tasks)(_.annotationBase.map(_.dataSetName).futureBox.map(_.toOption))
 }

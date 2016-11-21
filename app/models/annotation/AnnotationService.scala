@@ -1,12 +1,9 @@
 package models.annotation
 
-import java.io.{BufferedOutputStream, File, FileOutputStream}
+import java.io.{BufferedOutputStream, FileOutputStream}
 
 import scala.concurrent.Future
 
-import com.scalableminds.util.tools.{Fox, FoxImplicits, TextUtils}
-import play.api.libs.concurrent.Execution.Implicits._
-import models.task.{Task, TaskService}
 import com.scalableminds.util.geometry.{BoundingBox, Point3D, Vector3D}
 import com.scalableminds.util.io.ZipIO
 import com.scalableminds.util.mvc.BoxImplicits
@@ -15,16 +12,12 @@ import com.scalableminds.util.tools.{Fox, FoxImplicits, TextUtils}
 import models.annotation.AnnotationType._
 import models.binary.{DataSet, DataSetDAO}
 import models.task.Task
+import models.tracing.skeleton.SkeletonTracing
+import models.tracing.skeleton.persistence.{SkeletonTracingInit, SkeletonTracingService}
 import models.tracing.volume.VolumeTracingService
 import models.user.{UsedAnnotationDAO, User}
 import net.liftweb.common.Full
 import oxalis.nml.NML
-import com.scalableminds.util.mvc.BoxImplicits
-import com.typesafe.scalalogging.LazyLogging
-import models.tracing.skeleton.SkeletonTracing
-import reactivemongo.play.json.BSONFormats._
-import models.tracing.skeleton.persistence.{SkeletonTracingInit, SkeletonTracingService}
-import play.api.i18n.{Messages, MessagesApi}
 import play.api.i18n.Messages
 import play.api.libs.Files.TemporaryFile
 import play.api.libs.concurrent.Execution.Implicits._
@@ -46,14 +39,20 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     dataSetTeams.intersect(user.teamNames).head
   }
 
-  def createExplorationalFor(user: User, dataSet: DataSet, contentType: String, id: String = "")(implicit ctx: DBAccessContext) =
+  def createExplorationalFor(
+    user: User,
+    dataSet: DataSet,
+    contentType: String,
+    id: String = "")(implicit ctx: DBAccessContext) = {
+
     withProviderForContentType(contentType) { provider =>
       for {
         contentReference <- provider.createFrom(dataSet)
         annotation = Annotation(
           Some(user._id),
           contentReference,
-          team = selectSuitableTeam(user, dataSet),
+          selectSuitableTeam(user, dataSet),
+          dataSet.name,
           typ = AnnotationType.Explorational,
           state = AnnotationState.InProgress,
           _id = BSONObjectID.parse(id).getOrElse(BSONObjectID.generate)
@@ -61,6 +60,7 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
         _ <- AnnotationDAO.insert(annotation)
       } yield annotation
     }
+  }
 
   def updateAllOfTask(
     task: Task,
@@ -113,7 +113,8 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     AnnotationDAO.findFor(user._id, isFinished, AnnotationType.Task, limit)
 
   def findExploratoryOf(user: User, isFinished: Option[Boolean], limit: Int)(implicit ctx: DBAccessContext) =
-    AnnotationDAO.findForWithTypeOtherThan(user._id, isFinished, AnnotationType.Task :: AnnotationType.SystemTracings, limit)
+    AnnotationDAO.findForWithTypeOtherThan(
+      user._id, isFinished, AnnotationType.Task :: AnnotationType.SystemTracings, limit)
 
   def countTaskOf(user: User, _task: BSONObjectID)(implicit ctx: DBAccessContext) =
     AnnotationDAO.countByTaskIdAndUser(user._id, _task, AnnotationType.Task)
@@ -143,9 +144,19 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     start: Point3D,
     rotation: Vector3D)(implicit ctx: DBAccessContext) = {
 
+    val skeletonInit = SkeletonTracingInit(
+      dataSetName, start, rotation, boundingBox, insertStartAsNode = true, isFirstBranchPoint = true, settings)
+
     for {
-      content <- SkeletonTracingService.createFrom(SkeletonTracingInit(dataSetName, start, rotation, boundingBox, insertStartAsNode = true, isFirstBranchPoint = true, settings)) ?~> "Failed to create skeleton tracing."
-      _ <- AnnotationDAO.insert(Annotation(Some(userId), content, team = task.team, typ = AnnotationType.TracingBase, _task = Some(task._id))) ?~> "Failed to insert annotation."
+      content <- SkeletonTracingService.createFrom(skeletonInit) ?~> "Failed to create skeleton tracing."
+      annotation = Annotation(
+        Some(userId),
+        content,
+        task.team,
+        dataSetName,
+        typ = AnnotationType.TracingBase,
+        _task = Some(task._id))
+      _ <- AnnotationDAO.insert(annotation) ?~> "Failed to insert annotation."
     } yield content
   }
 
@@ -158,13 +169,20 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     }
   }
 
-  def createFrom(dataSetName: String, user: User, content: ContentReference, annotationType: AnnotationType, name: Option[String])(implicit messages: Messages, ctx: DBAccessContext) = {
+  def createFrom(
+    dataSetName: String,
+    user: User,
+    content: ContentReference,
+    annotationType: AnnotationType,
+    name: Option[String])(implicit messages: Messages, ctx: DBAccessContext) = {
+
     for {
       dataSet <- DataSetDAO.findOneBySourceName(dataSetName) ?~> Messages("dataSet.notFound", dataSetName)
       annotation = Annotation(
         Some(user._id),
         content,
-        team = selectSuitableTeam(user, dataSet),
+        selectSuitableTeam(user, dataSet),
+        dataSetName,
         _name = name,
         typ = annotationType)
       _ <- AnnotationDAO.insert(annotation)
@@ -177,8 +195,9 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     val annotation = Annotation(
       temporary._user,
       contentReference,
-      temporary._task,
       temporary.team,
+      temporary.dataSetName,
+      temporary._task,
       temporary.state,
       temporary.typ,
       temporary.version,
@@ -219,12 +238,25 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     }
   }
 
-  def createAnnotationBase(task: Task, userId: BSONObjectID, boundingBox: Option[BoundingBox], settings: AnnotationSettings, nml: NML)(implicit ctx: DBAccessContext) = {
-    for{
+  def createAnnotationBase(
+    task: Task,
+    userId: BSONObjectID,
+    boundingBox: Option[BoundingBox],
+    settings: AnnotationSettings,
+    nml: NML)(implicit ctx: DBAccessContext) = {
+
+    for {
       tracing <- SkeletonTracing.createFrom(List(nml), boundingBox, Some(settings))
       contentReference <- SkeletonTracingService.createFrom(tracing)
-      annotation <- AnnotationDAO.insert(Annotation(Some(userId), contentReference, team = task.team, typ = AnnotationType.TracingBase, _task = Some(task._id)))
-    } yield annotation
+      annotation = Annotation(
+        Some(userId),
+        contentReference,
+        task.team,
+        tracing.dataSetName,
+        typ = AnnotationType.TracingBase,
+        _task = Some(task._id))
+      result <- AnnotationDAO.insert(annotation)
+    } yield result
   }
 
   def createAnnotationFrom(
@@ -238,13 +270,22 @@ object AnnotationService extends AnnotationContentProviders with BoxImplicits wi
     // annotation --> hence, this hacky way of making a decision
     if (nmls.exists(_.volumes.nonEmpty)) {
       // There is a NML with a volume reference --> volume annotation
-      for{
-        content <- VolumeTracingService.createFrom(nmls, additionalFiles, None, AnnotationSettings.volumeDefault)
-        annotation <- AnnotationService.createFrom(content.dataSetName, user, ContentReference.createFor(content), typ, name)
+      for {
+        content <- VolumeTracingService.createFrom(
+          nmls,
+          additionalFiles,
+          None,
+          AnnotationSettings.volumeDefault)
+        annotation <- AnnotationService.createFrom(
+          content.dataSetName,
+          user,
+          ContentReference.createFor(content),
+          typ,
+          name)
       } yield annotation
     } else {
       // There is no NML with a volume reference --> skeleton annotation
-      for{
+      for {
         tracing <- SkeletonTracing.createFrom(nmls, None, Some(AnnotationSettings.skeletonDefault))
         contentReference <- SkeletonTracingService.createFrom(tracing)
         annotation <- AnnotationService.createFrom(tracing.dataSetName, user, contentReference, typ, name)
