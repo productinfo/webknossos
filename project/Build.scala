@@ -14,7 +14,7 @@ object Dependencies{
   val akkaVersion = "2.4.1"
   val reactiveVersion = "0.11.14"
   val reactivePlayVersion = "0.11.14-play24"
-  val braingamesVersion = "8.15.2-SNAPSHOT"
+  val braingamesVersion = "8.15.2"
   val twelvemonkeysVersion = "3.1.2"
   val twitterChillVersion = "0.8.0"
 
