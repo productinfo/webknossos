@@ -1,12 +1,14 @@
+import scala.concurrent.Future
+
 import akka.actor.{PoisonPill, Props}
 import akka.routing.RoundRobinPool
 import akka.actor.{ActorSystem, Props}
 import com.newrelic.api.agent.NewRelic
-import com.scalableminds.util.reactivemongo.GlobalDBAccess
+import com.scalableminds.util.reactivemongo.{GlobalAccessContext, GlobalDBAccess}
 import com.scalableminds.util.security.SCrypt
 import models.binary.{DataStore, DataStoreDAO, WebKnossosStore}
 import models.team._
-import net.liftweb.common.Full
+import net.liftweb.common.{Box, Full}
 import oxalis.jobs.AvailableTasksJob
 import play.api._
 import play.api.libs.concurrent._
@@ -22,6 +24,10 @@ import play.api.libs.json.Json
 import play.api.mvc._
 import scala.concurrent.duration._
 
+import models.annotation.AnnotationDAO
+import models.tracing.skeleton.{DBSkeletonTracing, DBSkeletonTracingDAO, DBSkeletonTracingService}
+import play.api.libs.iteratee.Iteratee
+
 object Global extends GlobalSettings {
   var clusters: List[ActorSystem] = Nil
 
@@ -34,6 +40,9 @@ object Global extends GlobalSettings {
     if (conf.getBoolean("application.insertInitialData") getOrElse false) {
       InitialData.insert()
     }
+
+    Akka.system(app).scheduler.scheduleOnce(10 seconds)(automaticSkeletonActorCreator())
+
     super.onStart(app)
   }
 
@@ -64,6 +73,21 @@ object Global extends GlobalSettings {
       SkeletonTracingService.start(sys)
       sys
     }
+  }
+
+  def automaticSkeletonActorCreator() = {
+    Logger.info("Started skeleton actor creation.")
+    val dbSkeletons = DBSkeletonTracingService
+    .findAllAsStream()
+
+    val actorCreator = Iteratee.foldM[DBSkeletonTracing, Box[Boolean]](Full(true)){
+      case (state, skeleton) =>
+        Logger.info(s"Creating actor for: ${skeleton._id.stringify}...")
+        SkeletonTracingService.findOneById(skeleton._id.stringify)(GlobalAccessContext).futureBox.map(b => state.map(_ && b.isDefined))
+    }
+
+    val r = dbSkeletons.run(actorCreator)
+    r.map(b => Logger.info("COMPLETED CREATION OF SKELETON ACTORS: " + b))
   }
 
   override def onError(request: RequestHeader, ex: Throwable) = {

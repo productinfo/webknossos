@@ -13,8 +13,9 @@ import akka.cluster.sharding.ShardRegion.Passivate
 import akka.event.LoggingReceive
 import akka.persistence._
 import com.scalableminds.util.geometry.BoundingBox
+import com.scalableminds.util.reactivemongo.GlobalAccessContext
 import com.typesafe.scalalogging.LazyLogging
-import models.tracing.skeleton.SkeletonTracing
+import models.tracing.skeleton.{SkeletonTracing, SkeletonTracingStatisticsDAO}
 import oxalis.actor.ALogging
 import oxalis.nml._
 
@@ -65,7 +66,7 @@ class SkeletonTracingProcessor extends PersistentActor with ALogging with LazyLo
   /**
     * Updates skeleton state
     */
-  private def updateState(evt: SkeletonEvt, state: Option[SkeletonTracing]): Option[SkeletonTracing] = {
+  private def handleEvents(evt: SkeletonEvt, state: Option[SkeletonTracing]): Option[SkeletonTracing] = {
     evt match {
       case WholeTracingChangedEvt(skeletonId, skeleton)                                                 =>
         Some(skeleton)
@@ -107,7 +108,7 @@ class SkeletonTracingProcessor extends PersistentActor with ALogging with LazyLo
     }
   }
 
-  private def initSkeleton(id: String, init: SkeletonTracingInit) = {
+  private def skeletonFromParameters(id: String, init: SkeletonTracingInit) = {
     val trees =
       if (init.insertStartAsNode) {
         val node = Node(1, init.start, init.rotation)
@@ -137,6 +138,59 @@ class SkeletonTracingProcessor extends PersistentActor with ALogging with LazyLo
       id = id)
   }
 
+  private def persistAndExecute(skeletonId: String, eventBuilder: List[SkeletonEvt]) = {
+    if (shouldSaveEvents) {
+      persistAll(eventBuilder) { evt =>
+        updateState(skeletonId, evt)
+      }
+    } else {
+      eventBuilder.foreach(evt => updateState(skeletonId, evt))
+    }
+  }
+
+  private def initState(skeletonId: String, skeleton: SkeletonTracing) = {
+    // Although the event handler will also set the skeleton when handling the WholeTracingChangedEvt, but we
+    // need the tracing to be set BEFORE switching the behaviour. Since the persist call is async, this can not be
+    // ensured otherwise.
+    state = Some(skeleton)
+    persistAndExecute(skeletonId, List(WholeTracingChangedEvt(skeletonId, skeleton)))
+    updateBehaviour(traceableSkeleton)
+    sender() ! ValidUpdateAck(skeletonId)
+  }
+
+  private def storeSnapshotIfChanged() = {
+    if (stateChangedSinceLastSnapshot) {
+      state.foreach { s =>
+        saveSnapshot(s)
+        // TODO: think about using the event stream for this. e.g publish a stats changed event that someone picks up
+        SkeletonTracingStatisticsDAO.updateStats(s.stats)(GlobalAccessContext)
+      }
+      stateChangedSinceLastSnapshot = false
+    }
+  }
+
+  private def updateState(skeletonId: String, evt: SkeletonEvt) = {
+    state = handleEvents(evt, state)
+    stateChangedSinceLastSnapshot = true
+
+    if (shouldSaveEvents && lastSequenceNr % SkeletonTracingProcessor.maxCmdsBetweenSnapshots == 0) {
+      storeSnapshotIfChanged()
+    }
+  }
+
+  private def handleCmd(cmd: SkeletonCmd, isValid: => Boolean, eventBuilder: => List[SkeletonEvt], errorMsgIfInvalid: String) = {
+    if (!isValid) {
+      sender() ! InvalidUpdateAck(cmd.skeletonId, errorMsgIfInvalid)
+    } else {
+      persistAndExecute(cmd.skeletonId, eventBuilder)
+      sender() ! ValidUpdateAck(cmd.skeletonId)
+    }
+  }
+
+  //
+  // Messages this actor is going to handle
+  //
+
   override def receiveCommand: Receive = initialBehaviour
 
   def initialBehaviour = passivate(uninitialized.orElse(queries)).orElse(defaultCommands)
@@ -156,42 +210,10 @@ class SkeletonTracingProcessor extends PersistentActor with ALogging with LazyLo
   def uninitialized: Receive = LoggingReceive.withLabel("unintialzed") {
 
     case InitSkeletonCmd(id, initParams) =>
-      val skeleton = initSkeleton(id, initParams)
-      state = Some(skeleton)
-      persist(WholeTracingChangedEvt(id, skeleton)) { event =>
-        updateStateAndNotifySender(id, event)
-      }
-      updateBehaviour(traceableSkeleton)
-  }
+      initState(id, skeletonFromParameters(id, initParams))
 
-  def storeSnapshotIfChanged() = {
-    if (stateChangedSinceLastSnapshot) {
-      state.foreach(s => saveSnapshot(s))
-      stateChangedSinceLastSnapshot = false
-    }
-  }
-
-  def updateStateAndNotifySender(skeletonId: String, evt: SkeletonEvt) = {
-    state = updateState(evt, state)
-    stateChangedSinceLastSnapshot = true
-
-    if (shouldSaveEvents && lastSequenceNr % SkeletonTracingProcessor.maxCmdsBetweenSnapshots == 0) {
-      storeSnapshotIfChanged()
-    }
-
-    sender() ! ValidUpdateAck(skeletonId)
-  }
-
-  def handleCmd(cmd: SkeletonCmd, isValid: => Boolean, eventBuilder: => List[SkeletonEvt], errorMsgIfInvalid: String) = {
-    if (!isValid) {
-      sender() ! InvalidUpdateAck(cmd.skeletonId, errorMsgIfInvalid)
-    } else if (shouldSaveEvents) {
-      persistAll(eventBuilder) { evt =>
-        updateStateAndNotifySender(cmd.skeletonId, evt)
-      }
-    } else {
-      eventBuilder.foreach(evt => updateStateAndNotifySender(cmd.skeletonId, evt))
-    }
+    case PresetSkeletonCmd(id, skeleton) =>
+      initState(id, skeleton)
   }
 
   def traceableSkeleton: Receive = LoggingReceive.withLabel("traceable") {
@@ -354,7 +376,7 @@ class SkeletonTracingProcessor extends PersistentActor with ALogging with LazyLo
   /**
     * Once recovery is complete, check the state to become the appropriate behaviour
     */
-  def postRecoveryBecome(skeletonRecoverStateMaybe: Option[SkeletonTracing]): Unit =
+  private def postRecoveryBecome(skeletonRecoverStateMaybe: Option[SkeletonTracing]): Unit =
     skeletonRecoverStateMaybe.foreach { skeletonState =>
       state = Some(skeletonState)
       if (skeletonState.isArchived) {
@@ -364,7 +386,7 @@ class SkeletonTracingProcessor extends PersistentActor with ALogging with LazyLo
       }
     }
 
-  def updateBehaviour(behaviour: => Receive): Unit = {
+  private def updateBehaviour(behaviour: => Receive): Unit = {
     logger.debug("Switching behaviour of " + self.path.toString)
     context.become(passivate(behaviour.orElse(queries)).orElse(defaultCommands))
   }
@@ -403,14 +425,9 @@ class SkeletonTracingProcessor extends PersistentActor with ALogging with LazyLo
   private var skeletonRecoverStateMaybe: Option[SkeletonTracing] = None
 
   def receiveRecover: Receive = {
-    case WholeTracingChangedEvt(id, skeleton) =>
-      skeletonRecoverStateMaybe =
-        Some(skeleton)
-
     case evt: SkeletonEvt =>
       logger.info(s"Replaying evt [${evt.skeletonId}]. LSN: " + lastSequenceNr)
-      skeletonRecoverStateMaybe =
-        updateState(evt, skeletonRecoverStateMaybe)
+      skeletonRecoverStateMaybe = handleEvents(evt, skeletonRecoverStateMaybe)
 
     case RecoveryCompleted =>
       logger.info("Recovery completed.")

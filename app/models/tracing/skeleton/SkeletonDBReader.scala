@@ -15,6 +15,7 @@ import reactivemongo.api.indexes.{Index, IndexType}
 import reactivemongo.bson.BSONObjectID
 import play.modules.reactivemongo.json.BSONFormats._
 import play.api.libs.concurrent.Execution.Implicits._
+import play.api.libs.iteratee.Enumerator
 
 case class DBEdge(edge: Edge, _treeId: BSONObjectID, _id: BSONObjectID = BSONObjectID.generate)
 
@@ -91,7 +92,6 @@ case class DBSkeletonTracing(
   editRotation: Vector3D,
   zoomLevel: Double,
   boundingBox: Option[BoundingBox],
-  stats: Option[SkeletonTracingStatistics],
   settings: AnnotationSettings = AnnotationSettings.skeletonDefault,
   _id: BSONObjectID = BSONObjectID.generate
 ) {
@@ -135,5 +135,12 @@ object DBSkeletonTracingService{
         id = sk._id.stringify
       )
     }
+  }
+
+  def findAllAsStream(): Enumerator[DBSkeletonTracing] = {
+    DBSkeletonTracingDAO
+    .find()(GlobalAccessContext)
+    .cursor[DBSkeletonTracing]()
+    .enumerate()
   }
 }

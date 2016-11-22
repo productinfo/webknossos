@@ -7,6 +7,7 @@ import com.scalableminds.util.geometry.{BoundingBox, Point3D, Scale, Vector3D}
 import com.scalableminds.util.reactivemongo.DBAccessContext
 import com.scalableminds.util.tools.{Fox, FoxImplicits}
 import models.binary.{DataSet, DataSetDAO, DataStoreInfo}
+import models.tracing.TracingStatistics
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.functional.syntax._
 import play.api.libs.iteratee.Enumerator
@@ -28,6 +29,8 @@ trait AnnotationContent {
   def timestamp: Long
 
   def dataSetName: String
+
+  def stats: TracingStatistics
 
   def settings: AnnotationSettings
 

@@ -35,7 +35,7 @@ case class SkeletonTracing(
 
   lazy val treeMap = trees.map(t => t.id -> t).toMap
 
-  lazy val stats = {
+  def stats = {
     val numberOfTrees = trees.size
 
     val (numberOfNodes, numberOfEdges) = trees.foldLeft((0l, 0l)) {
@@ -45,7 +45,7 @@ case class SkeletonTracing(
         (nodeCount + nNodes, edgeCount + nEdges)
     }
 
-    Some(SkeletonTracingStatistics(numberOfNodes, numberOfEdges, numberOfTrees))
+    SkeletonTracingStatistics(id, numberOfNodes, numberOfEdges, numberOfTrees)
   }
 
   def allowAllModes =

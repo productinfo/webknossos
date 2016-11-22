@@ -76,7 +76,7 @@ object SkeletonTracingService extends AnnotationContentService with FoxImplicits
   def createFrom(skeleton: SkeletonTracing): Fox[ContentReference] = {
     logger.info("Started to create messages for actor init. ID: " + skeleton.id)
     val stopPersistCmd = StopEventPersistence(skeleton.id)
-    val initCommand = InitSkeletonCmd(skeleton.id, SkeletonTracingInit.from(skeleton))
+    val initCommand = PresetSkeletonCmd(skeleton.id, skeleton.copy(trees = Nil))
     val (splitted, mapping) = skeleton.splitByNodes(maxNodeCount = 5000)
 
     val treeCreateCommands = splitted.trees.map(t => CreateTreeCmd(skeleton.id, t))

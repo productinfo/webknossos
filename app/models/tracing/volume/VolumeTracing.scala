@@ -7,6 +7,8 @@ import models.basics.SecuredBaseDAO
 import models.binary._
 import java.io.{FileInputStream, InputStream, PipedInputStream, PipedOutputStream}
 
+import scala.concurrent.Future
+
 import models.tracing.CommonTracingService
 import net.liftweb.common.{Failure, Full}
 import play.api.Logger
@@ -68,6 +70,8 @@ case class VolumeTracing(
       ContentReference.createFor(v)
     }
   }
+
+  def stats = VolumeTracingStatistics()
 
   def contentType: String = VolumeTracing.contentType
 

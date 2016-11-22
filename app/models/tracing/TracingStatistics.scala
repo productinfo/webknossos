@@ -1,11 +1,14 @@
 package models.tracing
 
-import models.tracing.skeleton.{SkeletonTracing, SkeletonTracingStatistics}
+import models.tracing.skeleton.{SkeletonTracing, SkeletonTracingStatistics, SkeletonTracingStatisticsDAO}
 import models.tracing.volume.VolumeTracingStatistics
-import models.annotation.{AnnotationLike, AnnotationContent}
+import models.annotation.{AnnotationContent, AnnotationLike}
 import play.api.Logger
 import scala.concurrent.Future
-import com.scalableminds.util.tools.{FoxImplicits, Fox}
+
+import com.scalableminds.util.reactivemongo.DBAccessContext
+import com.scalableminds.util.tools.{Fox, FoxImplicits}
+import models.tracing.skeleton.persistence.SkeletonTracingService
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
 
@@ -21,12 +24,13 @@ trait TracingStatistics{
 }
 
 trait AnnotationStatistics extends FoxImplicits { this: AnnotationLike =>
-  def statisticsForAnnotation(): Fox[TracingStatistics] = {
-    this.content.flatMap {
-      case t: SkeletonTracing =>
-        t.stats
-      case _                  =>
-        Logger.warn("No statistics available for content")
+  def statisticsForAnnotation()(implicit ctx: DBAccessContext): Fox[TracingStatistics] = {
+    this.contentReference.contentType match {
+      case SkeletonTracing.contentType =>
+        SkeletonTracingStatisticsDAO.findOneBySkeleton(this.contentReference._id).orElse(this.content.map(_.stats))
+      case _                      =>
+        Logger.debug("No statistics available for content")
+        // TODO: remove when volume statistics are implemented
         Future.successful(VolumeTracingStatistics())
     }
   }

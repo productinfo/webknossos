@@ -21,6 +21,8 @@ case class ResumeEventPersistence(skeletonId: String) extends SkeletonCmd
 
 case class InitSkeletonCmd(skeletonId: String, initialParams: SkeletonTracingInit) extends SkeletonCmd
 
+case class PresetSkeletonCmd(skeletonId: String, skeleton: SkeletonTracing) extends SkeletonCmd
+
 case class CreateNodeCmd(skeletonId: String, treeId: Int, node: Node) extends SkeletonCmd
 
 case class DeleteNodeCmd(skeletonId: String, treeId: Int, node: Int) extends SkeletonCmd
