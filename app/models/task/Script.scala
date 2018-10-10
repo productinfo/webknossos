@@ -12,15 +12,14 @@ import utils.{ObjectId, SQLClient, SQLDAO}
 
 import scala.concurrent.ExecutionContext
 
-
 case class Script(
-                    _id: ObjectId,
-                    _owner: ObjectId,
-                    name: String,
-                    gist: String,
-                    created: Long = System.currentTimeMillis(),
-                    isDeleted: Boolean = false
-                    )
+    _id: ObjectId,
+    _owner: ObjectId,
+    name: String,
+    gist: String,
+    created: Long = System.currentTimeMillis(),
+    isDeleted: Boolean = false
+)
 
 class ScriptService @Inject()(userDAO: UserDAO, userService: UserService)(implicit ec: ExecutionContext) {
 
@@ -41,33 +40,30 @@ class ScriptService @Inject()(userDAO: UserDAO, userService: UserService)(implic
 }
 
 object Script {
-  def fromForm(
-                name: String,
-                gist: String,
-                _owner: String) = {
-
+  def fromForm(name: String, gist: String, _owner: String) =
     Script(ObjectId.generate, ObjectId(_owner), name, gist)
-  }
 }
 
-class ScriptDAO @Inject()(sqlClient: SQLClient)(implicit ec: ExecutionContext) extends SQLDAO[Script, ScriptsRow, Scripts](sqlClient) {
+class ScriptDAO @Inject()(sqlClient: SQLClient)(implicit ec: ExecutionContext)
+    extends SQLDAO[Script, ScriptsRow, Scripts](sqlClient) {
   val collection = Scripts
 
   def idColumn(x: Scripts): Rep[String] = x._Id
   def isDeletedColumn(x: Scripts): Rep[Boolean] = x.isdeleted
 
   override def readAccessQ(requestingUserId: ObjectId): String =
-    s"(select _organization from webknossos.users_ u where u._id = _owner) = (select _organization from webknossos.users_ u where u._id = '${requestingUserId}')"
+    s"(select _organization from webknossos.users_ u where u._id = _owner) = (select _organization from webknossos.users_ u where u._id = '$requestingUserId')"
 
   def parse(r: ScriptsRow): Fox[Script] =
-    Fox.successful(Script(
-      ObjectId(r._Id),
-      ObjectId(r._Owner),
-      r.name,
-      r.gist,
-      r.created.getTime,
-      r.isdeleted
-    ))
+    Fox.successful(
+      Script(
+        ObjectId(r._Id),
+        ObjectId(r._Owner),
+        r.name,
+        r.gist,
+        r.created.getTime,
+        r.isdeleted
+      ))
 
   def insertOne(s: Script)(implicit ctx: DBAccessContext): Fox[Unit] =
     for {
@@ -90,7 +86,7 @@ class ScriptDAO @Inject()(sqlClient: SQLClient)(implicit ec: ExecutionContext) e
   override def findAll(implicit ctx: DBAccessContext): Fox[List[Script]] =
     for {
       accessQuery <- readAccessQuery
-      r <- run(sql"select #${columns} from webknossos.scripts_ where #${accessQuery}".as[ScriptsRow])
+      r <- run(sql"select #$columns from webknossos.scripts_ where #$accessQuery".as[ScriptsRow])
       parsed <- Fox.combined(r.toList.map(parse))
     } yield parsed
 }

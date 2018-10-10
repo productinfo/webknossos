@@ -14,11 +14,12 @@ class AnnotationInformationHandlerSelector @Inject()(projectInformationHandler: 
                                                      taskInformationHandler: TaskInformationHandler,
                                                      taskTypeInformationHandler: TaskTypeInformationHandler,
                                                      savedTracingInformationHandler: SavedTracingInformationHandler) {
-  val informationHandlers: Map[AnnotationType, AnnotationInformationHandler] = Map(
-    AnnotationType.CompoundProject -> projectInformationHandler,
-    AnnotationType.CompoundTask     -> taskInformationHandler,
-    AnnotationType.CompoundTaskType -> taskTypeInformationHandler)
-      .withDefaultValue(savedTracingInformationHandler)
+  val informationHandlers: Map[AnnotationType, AnnotationInformationHandler] =
+    Map(
+      AnnotationType.CompoundProject -> projectInformationHandler,
+      AnnotationType.CompoundTask -> taskInformationHandler,
+      AnnotationType.CompoundTaskType -> taskTypeInformationHandler
+    ).withDefaultValue(savedTracingInformationHandler)
 }
 
 trait AnnotationInformationHandler extends FoxImplicits {
@@ -29,9 +30,8 @@ trait AnnotationInformationHandler extends FoxImplicits {
 
   def provideAnnotation(identifier: ObjectId, user: Option[User])(implicit ctx: DBAccessContext): Fox[Annotation]
 
-  def nameForAnnotation(t: Annotation)(implicit ctx: DBAccessContext): Fox[String] = {
+  def nameForAnnotation(t: Annotation)(implicit ctx: DBAccessContext): Fox[String] =
     Fox.successful(t.id)
-  }
 
   def restrictionsFor(identifier: ObjectId)(implicit ctx: DBAccessContext): Fox[AnnotationRestrictions]
 
@@ -39,7 +39,8 @@ trait AnnotationInformationHandler extends FoxImplicits {
     def allOnSameDatasetIter(annotations: List[Annotation], _dataSet: ObjectId): Boolean =
       annotations match {
         case List() => true
-        case head :: tail => head._dataSet == _dataSet && allOnSameDatasetIter(tail, _dataSet)
+        case head :: tail =>
+          head._dataSet == _dataSet && allOnSameDatasetIter(tail, _dataSet)
       }
     annotations match {
       case List() => Fox.successful(true)
@@ -52,8 +53,7 @@ trait AnnotationInformationHandler extends FoxImplicits {
     }
   }
 
-  def assertNonEmpty[T](seq: List[T]): Fox[Unit] = {
+  def assertNonEmpty[T](seq: List[T]): Fox[Unit] =
     if (seq.isEmpty) Fox.failure("no annotations")
     else Fox.successful(())
-  }
 }

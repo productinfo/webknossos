@@ -4,6 +4,7 @@ import sbt._
 
 ThisBuild / version := "wk"
 ThisBuild / scalaVersion := "2.11.8"
+ThisBuild / scapegoatVersion := "1.3.8"
 ThisBuild / scalacOptions ++= Seq(
   "-Xmax-classfile-name","100",
   "-target:jvm-1.8",
@@ -12,6 +13,8 @@ ThisBuild / scalacOptions ++= Seq(
   "-language:implicitConversions",
   "-language:postfixOps"
 )
+
+scapegoatIgnoredFiles := Seq(".*/Tables.scala", ".*/Routes.scala")
 
 lazy val commonSettings = Seq(
   resolvers ++= DependencyResolvers.dependencyResolvers,

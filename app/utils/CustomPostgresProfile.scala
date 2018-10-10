@@ -38,4 +38,4 @@ trait CustomPostgresProfile extends ExPostgresProfile
 }
 
 object CustomPostgresProfile extends CustomPostgresProfile
-*/
+ */

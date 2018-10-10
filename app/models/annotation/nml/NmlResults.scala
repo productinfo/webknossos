@@ -8,13 +8,13 @@ import play.api.libs.Files.TemporaryFile
 
 import scala.concurrent.ExecutionContext
 
-
 object NmlResults extends LazyLogging {
 
   sealed trait NmlParseResult {
     def fileName: String
 
-    def bothTracingOpts: Option[(Option[SkeletonTracing], Option[(VolumeTracing, String)])] = None
+    def bothTracingOpts: Option[(Option[SkeletonTracing], Option[(VolumeTracing, String)])] =
+      None
 
     def description: Option[String] = None
 
@@ -30,10 +30,15 @@ object NmlResults extends LazyLogging {
     }
   }
 
-  case class NmlParseSuccess(fileName: String, skeletonTracing: Option[SkeletonTracing], volumeTracingWithDataLocation: Option[(VolumeTracing, String)], _description: String) extends NmlParseResult {
+  case class NmlParseSuccess(fileName: String,
+                             skeletonTracing: Option[SkeletonTracing],
+                             volumeTracingWithDataLocation: Option[(VolumeTracing, String)],
+                             _description: String)
+      extends NmlParseResult {
     def succeeded = true
 
-    override def bothTracingOpts = Some((skeletonTracing, volumeTracingWithDataLocation))
+    override def bothTracingOpts =
+      Some((skeletonTracing, volumeTracingWithDataLocation))
 
     override def description = Some(_description)
   }
@@ -46,22 +51,19 @@ object NmlResults extends LazyLogging {
     def succeeded = false
   }
 
-  case class ZipParseResult(parseResults: List[NmlParseResult] = Nil, otherFiles: Map[String, TemporaryFile] = Map.empty) {
-    def combineWith(other: ZipParseResult) = {
+  case class ZipParseResult(parseResults: List[NmlParseResult] = Nil,
+                            otherFiles: Map[String, TemporaryFile] = Map.empty) {
+    def combineWith(other: ZipParseResult) =
       ZipParseResult(parseResults ::: other.parseResults, other.otherFiles ++ otherFiles)
-    }
 
-    def isEmpty = {
+    def isEmpty =
       !parseResults.exists(_.succeeded)
-    }
 
-    def containsFailure = {
+    def containsFailure =
       parseResults.exists {
         case _: NmlParseFailure => true
-        case _ => false
+        case _                  => false
       }
-    }
   }
 
 }
-

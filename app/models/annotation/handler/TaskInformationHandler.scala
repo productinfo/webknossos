@@ -16,10 +16,12 @@ class TaskInformationHandler @Inject()(taskDAO: TaskDAO,
                                        annotationDAO: AnnotationDAO,
                                        userService: UserService,
                                        annotationMerger: AnnotationMerger,
-                                       projectDAO: ProjectDAO)
-                                      (implicit val ec: ExecutionContext) extends AnnotationInformationHandler with FoxImplicits {
+                                       projectDAO: ProjectDAO)(implicit val ec: ExecutionContext)
+    extends AnnotationInformationHandler
+    with FoxImplicits {
 
-  override def provideAnnotation(taskId: ObjectId, userOpt: Option[User])(implicit ctx: DBAccessContext): Fox[Annotation] =
+  override def provideAnnotation(taskId: ObjectId, userOpt: Option[User])(
+      implicit ctx: DBAccessContext): Fox[Annotation] =
     for {
       task <- taskDAO.findOne(taskId) ?~> "task.notFound"
       annotations <- annotationDAO.findAllByTaskIdAndType(task._id, AnnotationType.Task)
@@ -29,8 +31,13 @@ class TaskInformationHandler @Inject()(taskDAO: TaskDAO,
       user <- userOpt ?~> "user.notAuthorised"
       project <- projectDAO.findOne(task._project)
       _dataSet = finishedAnnotations.head._dataSet
-      mergedAnnotation <- annotationMerger.mergeN(task._id, persistTracing=false, user._id,
-        _dataSet, project._team, AnnotationType.CompoundTask, finishedAnnotations) ?~> "annotation.merge.failed.compound"
+      mergedAnnotation <- annotationMerger.mergeN(task._id,
+                                                  persistTracing = false,
+                                                  user._id,
+                                                  _dataSet,
+                                                  project._team,
+                                                  AnnotationType.CompoundTask,
+                                                  finishedAnnotations) ?~> "annotation.merge.failed.compound"
     } yield mergedAnnotation
 
   def restrictionsFor(taskId: ObjectId)(implicit ctx: DBAccessContext) =

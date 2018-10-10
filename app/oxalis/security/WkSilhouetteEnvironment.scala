@@ -16,17 +16,17 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
-
 trait WkEnv extends Env {
   type I = User
   type A = CombinedAuthenticator
 }
 
-class WkSilhouetteEnvironment @Inject()(conf: WkConf,
-                                        tokenDAO: TokenDAO,
-                                        userService: UserService,
-                                        cookieHeaderEncoding: CookieHeaderEncoding
-                                     )(implicit val executionContext: ExecutionContext) extends Environment[WkEnv] {
+class WkSilhouetteEnvironment @Inject()(
+    conf: WkConf,
+    tokenDAO: TokenDAO,
+    userService: UserService,
+    cookieHeaderEncoding: CookieHeaderEncoding)(implicit val executionContext: ExecutionContext)
+    extends Environment[WkEnv] {
   val eventBusObject = EventBus()
 
   val cookieSettings = CookieAuthenticatorSettings(
@@ -52,7 +52,14 @@ class WkSilhouetteEnvironment @Inject()(conf: WkConf,
   val bearerTokenAuthenticatorDAO = new BearerTokenAuthenticatorRepository(tokenDAO)
 
   val combinedAuthenticatorService = CombinedAuthenticatorService(cookieSettings,
-    tokenSettings, bearerTokenAuthenticatorDAO, fingerprintGenerator, cookieHeaderEncoding, idGenerator, Clock(), userService, conf)
+                                                                  tokenSettings,
+                                                                  bearerTokenAuthenticatorDAO,
+                                                                  fingerprintGenerator,
+                                                                  cookieHeaderEncoding,
+                                                                  idGenerator,
+                                                                  Clock(),
+                                                                  userService,
+                                                                  conf)
 
   override def identityService: IdentityService[User] = userService
 

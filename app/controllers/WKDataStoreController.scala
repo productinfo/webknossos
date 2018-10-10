@@ -26,12 +26,12 @@ class WKDataStoreController @Inject()(dataSetService: DataSetService,
                                       organizationDAO: OrganizationDAO,
                                       timeSpanService: TimeSpanService,
                                       wkSilhouetteEnvironment: WkSilhouetteEnvironment,
-                                      sil: Silhouette[WkEnv])
-                                     (implicit ec: ExecutionContext)
-  extends Controller
+                                      sil: Silhouette[WkEnv])(implicit ec: ExecutionContext)
+    extends Controller
     with LazyLogging {
 
-  val bearerTokenService = wkSilhouetteEnvironment.combinedAuthenticatorService.tokenAuthenticatorService
+  val bearerTokenService =
+    wkSilhouetteEnvironment.combinedAuthenticatorService.tokenAuthenticatorService
 
   def validateDataSetUpload(name: String) = Action.async(parse.json) { implicit request =>
     dataStoreService.validateAccess(name) { dataStore =>
@@ -39,7 +39,8 @@ class WKDataStoreController @Inject()(dataSetService: DataSetService,
         uploadInfo <- request.body.validate[DataSourceId].asOpt.toFox ?~> "dataStore.upload.invalid"
         organization <- organizationDAO.findOneByName(uploadInfo.team)(GlobalAccessContext) ?~> "organization.notFound"
         _ <- bool2Fox(dataSetService.isProperDataSetName(uploadInfo.name)) ?~> "dataSet.name.invalid"
-        _ <- dataSetService.assertNewDataSetName(uploadInfo.name, organization._id)(GlobalAccessContext) ?~> "dataSet.name.alreadyTaken"
+        _ <- dataSetService
+          .assertNewDataSetName(uploadInfo.name, organization._id)(GlobalAccessContext) ?~> "dataSet.name.alreadyTaken"
         _ <- bool2Fox(uploadInfo.team.nonEmpty) ?~> "team.invalid"
       } yield Ok
     }
@@ -102,20 +103,21 @@ class WKDataStoreController @Inject()(dataSetService: DataSetService,
         statisticsOpt = (request.body \ "statistics").asOpt[JsObject]
         userTokenOpt = (request.body \ "userToken").asOpt[String]
         _ <- statisticsOpt match {
-          case Some(statistics) => annotationDAO.updateStatistics(annotation._id, statistics)(GlobalAccessContext)
+          case Some(statistics) =>
+            annotationDAO.updateStatistics(annotation._id, statistics)(GlobalAccessContext)
           case None => Fox.successful(())
         }
         _ <- annotationDAO.updateModified(annotation._id, System.currentTimeMillis)(GlobalAccessContext)
         userBox <- bearerTokenService.userForTokenOpt(userTokenOpt)(GlobalAccessContext).futureBox
-        _ <- Fox.runOptional(userBox)(user => timeSpanService.logUserInteraction(timestamps, user, annotation)(GlobalAccessContext))
+        _ <- Fox.runOptional(userBox)(user =>
+          timeSpanService.logUserInteraction(timestamps, user, annotation)(GlobalAccessContext))
       } yield {
         Ok
       }
     }
   }
 
-  private def ensureAnnotationNotFinished(annotation: Annotation) = {
+  private def ensureAnnotationNotFinished(annotation: Annotation) =
     if (annotation.state == Finished) Fox.failure("annotation already finshed")
     else Fox.successful(())
-  }
 }

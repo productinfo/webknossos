@@ -9,7 +9,6 @@ import models.annotation.AnnotationState._
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 
-
 class AnnotationRestrictions {
   def allowAccess(user: Option[User]): Fox[Boolean] = Fox.successful(false)
 
@@ -36,11 +35,10 @@ object AnnotationRestrictions extends FoxImplicits {
       allowFinish <- ar.allowFinish(u)
       allowDownload <- ar.allowDownload(u)
     } yield {
-      Json.obj(
-        "allowAccess" -> allowAccess,
-        "allowUpdate" -> allowUpdate,
-        "allowFinish" -> allowFinish,
-        "allowDownload" -> allowDownload)
+      Json.obj("allowAccess" -> allowAccess,
+               "allowUpdate" -> allowUpdate,
+               "allowFinish" -> allowFinish,
+               "allowDownload" -> allowDownload)
     }
 }
 
@@ -50,8 +48,8 @@ class AnnotationRestrictionDefaults @Inject()(userService: UserService) extends 
 
   def defaultsFor(annotation: Annotation): AnnotationRestrictions =
     new AnnotationRestrictions {
-      override def allowAccess(userOption: Option[User]) = {
-        if(annotation.isPublic) Fox.successful(true)
+      override def allowAccess(userOption: Option[User]) =
+        if (annotation.isPublic) Fox.successful(true)
         else
           (for {
             user <- option2Fox(userOption)
@@ -59,23 +57,19 @@ class AnnotationRestrictionDefaults @Inject()(userService: UserService) extends 
           } yield {
             annotation._user == user._id || isTeamManagerOrAdminOfTeam
           }).orElse(Fox.successful(false))
-      }
 
-      override def allowUpdate(user: Option[User]) = {
-        Fox.successful(user.exists {
-          user =>
-            annotation._user == user._id && !(annotation.state == Finished)
+      override def allowUpdate(user: Option[User]) =
+        Fox.successful(user.exists { user =>
+          annotation._user == user._id && !(annotation.state == Finished)
         })
-      }
 
-      override def allowFinish(userOption: Option[User]) = {
+      override def allowFinish(userOption: Option[User]) =
         (for {
           user <- option2Fox(userOption)
           isTeamManagerOrAdminOfTeam <- userService.isTeamManagerOrAdminOf(user, annotation._team)
         } yield {
           (annotation._user == user._id || isTeamManagerOrAdminOfTeam) && !(annotation.state == Finished)
         }).orElse(Fox.successful(false))
-      }
     }
 
   def readonlyAnnotation() =

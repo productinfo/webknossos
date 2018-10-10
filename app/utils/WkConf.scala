@@ -16,13 +16,18 @@ class WkConf @Inject()(configuration: Configuration) extends ConfigReader {
     object Authentication {
       object DefaultUser {
         val email = get[String]("application.authentication.defaultUser.email")
-        val password = get[String]("application.authentication.defaultUser.password")
-        val isSuperUser = get[Boolean]("application.authentication.defaultUser.isSuperUser")
+        val password =
+          get[String]("application.authentication.defaultUser.password")
+        val isSuperUser =
+          get[Boolean]("application.authentication.defaultUser.isSuperUser")
       }
       val ssoKey = get[String]("application.authentication.ssoKey")
-      val enableDevAutoVerify = get[Boolean]("application.authentication.enableDevAutoVerify")
-      val enableDevAutoAdmin = get[Boolean]("application.authentication.enableDevAutoAdmin")
-      val enableDevAutoLogin = get[Boolean]("application.authentication.enableDevAutoLogin")
+      val enableDevAutoVerify =
+        get[Boolean]("application.authentication.enableDevAutoVerify")
+      val enableDevAutoAdmin =
+        get[Boolean]("application.authentication.enableDevAutoAdmin")
+      val enableDevAutoLogin =
+        get[Boolean]("application.authentication.enableDevAutoLogin")
       val children = List(DefaultUser)
     }
     val children = List(Authentication)
@@ -50,14 +55,16 @@ class WkConf @Inject()(configuration: Configuration) extends ConfigReader {
   object WebKnossos {
     object User {
       object Time {
-        val tracingPauseInSeconds = get[Int]("webKnossos.user.time.tracingPauseInSeconds") seconds
+        val tracingPauseInSeconds =
+          get[Int]("webKnossos.user.time.tracingPauseInSeconds") seconds
       }
       val children = List(Time)
     }
     object Tasks {
       val maxOpenPerUser = get[Int]("webKnossos.tasks.maxOpenPerUser")
     }
-    val newOrganizationMailingList = get[String]("webKnossos.newOrganizationMailingList")
+    val newOrganizationMailingList =
+      get[String]("webKnossos.newOrganizationMailingList")
 
     val children = List(User, Tasks)
   }
@@ -79,26 +86,36 @@ class WkConf @Inject()(configuration: Configuration) extends ConfigReader {
   }
 
   object Features {
-    val allowOrganizationCreation = get[Boolean]("features.allowOrganizationCreation")
+    val allowOrganizationCreation =
+      get[Boolean]("features.allowOrganizationCreation")
   }
 
   val operatorData = get[String]("operatorData")
 
   object Silhouette {
     object TokenAuthenticator {
-      val resetPasswordExpiry = get[Duration]("silhouette.tokenAuthenticator.resetPasswordExpiry")
-      val dataStoreExpiry = get[Duration]("silhouette.tokenAuthenticator.dataStoreExpiry")
-      val authenticatorExpiry = get[Duration]("silhouette.tokenAuthenticator.authenticatorExpiry")
-      val authenticatorIdleTimeout = get[Duration]("silhouette.tokenAuthenticator.authenticatorIdleTimeout")
+      val resetPasswordExpiry =
+        get[Duration]("silhouette.tokenAuthenticator.resetPasswordExpiry")
+      val dataStoreExpiry =
+        get[Duration]("silhouette.tokenAuthenticator.dataStoreExpiry")
+      val authenticatorExpiry =
+        get[Duration]("silhouette.tokenAuthenticator.authenticatorExpiry")
+      val authenticatorIdleTimeout =
+        get[Duration]("silhouette.tokenAuthenticator.authenticatorIdleTimeout")
     }
     object CookieAuthenticator {
       val cookieName = get[String]("silhouette.cookieAuthenticator.cookieName")
       val cookiePath = get[String]("silhouette.cookieAuthenticator.cookiePath")
-      val secureCookie = get[Boolean]("silhouette.cookieAuthenticator.secureCookie")
-      val httpOnlyCookie = get[Boolean]("silhouette.cookieAuthenticator.httpOnlyCookie")
-      val useFingerprinting = get[Boolean]("silhouette.cookieAuthenticator.useFingerprinting")
-      val authenticatorExpiry = get[Duration]("silhouette.cookieAuthenticator.authenticatorExpiry")
-      val cookieMaxAge = get[Duration]("silhouette.cookieAuthenticator.cookieMaxAge")
+      val secureCookie =
+        get[Boolean]("silhouette.cookieAuthenticator.secureCookie")
+      val httpOnlyCookie =
+        get[Boolean]("silhouette.cookieAuthenticator.httpOnlyCookie")
+      val useFingerprinting =
+        get[Boolean]("silhouette.cookieAuthenticator.useFingerprinting")
+      val authenticatorExpiry =
+        get[Duration]("silhouette.cookieAuthenticator.authenticatorExpiry")
+      val cookieMaxAge =
+        get[Duration]("silhouette.cookieAuthenticator.cookieMaxAge")
     }
     val children = List(TokenAuthenticator, CookieAuthenticator)
   }
@@ -116,5 +133,6 @@ class WkConf @Inject()(configuration: Configuration) extends ConfigReader {
     val children = List(Analytics)
   }
 
-  val children = List(Application, Http, Mail, WebKnossos, Datastore, User, Braintracing, Features, Silhouette, Airbrake, Google)
+  val children =
+    List(Application, Http, Mail, WebKnossos, Datastore, User, Braintracing, Features, Silhouette, Airbrake, Google)
 }

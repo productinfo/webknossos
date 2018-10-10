@@ -8,7 +8,8 @@ object AnnotationType extends Enumeration {
 
   val Task, View, Explorational, TracingBase, Orphan, CompoundTask, CompoundProject, CompoundTaskType = Value
 
-  implicit val enumReads: Reads[AnnotationType.Value] = EnumUtils.enumReads(AnnotationType)
+  implicit val enumReads: Reads[AnnotationType.Value] =
+    EnumUtils.enumReads(AnnotationType)
 
   implicit def enumWrites: Writes[AnnotationType.Value] = EnumUtils.enumWrites
 

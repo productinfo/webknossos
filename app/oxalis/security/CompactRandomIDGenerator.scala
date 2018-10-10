@@ -16,7 +16,8 @@ object CompactRandomIDGenerator {
     encode(randomValue)
   }
 
-  def encode(bytes: Array[Byte]) = Base64.getUrlEncoder.withoutPadding.encodeToString(bytes)
+  def encode(bytes: Array[Byte]) =
+    Base64.getUrlEncoder.withoutPadding.encodeToString(bytes)
 }
 
 class CompactRandomIDGenerator(sizeInBytes: Int = 16)(implicit ec: ExecutionContext) extends IDGenerator {
@@ -27,7 +28,5 @@ class CompactRandomIDGenerator(sizeInBytes: Int = 16)(implicit ec: ExecutionCont
       CompactRandomIDGenerator.encode(randomValue)
     }
   }
-
-
 
 }
