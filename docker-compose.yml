@@ -109,6 +109,14 @@ services:
       - "9000:9000"
     command: sbt -v -d "testOnly backend.*"
 
+  backend-lint-format:
+    extends:
+      service: base
+    ports:
+    - "5005:5005"
+    - "9000:9000"
+    command: sbt -v -d ";scapegoat; scalafmtCheck"
+
   e2e-tests:
     extends:
       service: backend-tests

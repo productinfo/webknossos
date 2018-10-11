@@ -27,10 +27,10 @@ class TaskInformationHandler @Inject()(taskDAO: TaskDAO,
       annotations <- annotationDAO.findAllByTaskIdAndType(task._id, AnnotationType.Task)
       finishedAnnotations = annotations.filter(_.state == Finished)
       _ <- assertAllOnSameDataset(finishedAnnotations)
-      _ <- assertNonEmpty(finishedAnnotations) ?~> "task.noAnnotations"
+      firstAnnotation <- finishedAnnotations.headOption.toFox ?~> "task.noAnnotations"
       user <- userOpt ?~> "user.notAuthorised"
       project <- projectDAO.findOne(task._project)
-      _dataSet = finishedAnnotations.head._dataSet
+      _dataSet = firstAnnotation._dataSet
       mergedAnnotation <- annotationMerger.mergeN(task._id,
                                                   persistTracing = false,
                                                   user._id,

@@ -10,6 +10,7 @@ import models.user.{User, UserService}
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 
+@SuppressWarnings(Array("AsInstanceOf"))
 class UserAuthInfoRepository @Inject()(userService: UserService) extends AuthInfoRepository {
 
   override def find[T <: AuthInfo](loginInfo: LoginInfo)(implicit tag: ClassTag[T]): Future[Option[T]] =

@@ -354,14 +354,13 @@ class Authentication @Inject()(actorSystem: ActorSystem,
 
   def getToken = sil.SecuredAction.async { implicit request =>
     val futureOfFuture: Future[Future[Result]] =
-      combinedAuthenticatorService.findByLoginInfo(request.identity.loginInfo).map { oldTokenOpt =>
-        oldTokenOpt match {
-          case Some(oldToken) => Future.successful(Ok(Json.obj("token" -> oldToken.id)))
-          case _ =>
-            combinedAuthenticatorService.createToken(request.identity.loginInfo).map { newToken =>
-              Ok(Json.obj("token" -> newToken.id))
-            }
-        }
+      combinedAuthenticatorService.findByLoginInfo(request.identity.loginInfo).map {
+        case Some(oldToken) => Future.successful(Ok(Json.obj("token" -> oldToken.id)))
+        case _ =>
+          combinedAuthenticatorService.createToken(request.identity.loginInfo).map { newToken =>
+            Ok(Json.obj("token" -> newToken.id))
+          }
+
       }
     for {
       resultFuture <- futureOfFuture
@@ -370,15 +369,12 @@ class Authentication @Inject()(actorSystem: ActorSystem,
   }
 
   def deleteToken = sil.SecuredAction.async { implicit request =>
-    val futureOfFuture: Future[Future[Result]] = for {
-      oldTokenOpt <- combinedAuthenticatorService.findByLoginInfo(request.identity.loginInfo)
-    } yield {
-      oldTokenOpt match {
+    val futureOfFuture: Future[Future[Result]] =
+      combinedAuthenticatorService.findByLoginInfo(request.identity.loginInfo).map {
         case Some(oldToken) =>
           combinedAuthenticatorService.discard(oldToken, Ok(Json.obj("messages" -> Messages("auth.tokenDeleted"))))
         case _ => Future.successful(Ok)
       }
-    }
 
     for {
       resultFuture <- futureOfFuture

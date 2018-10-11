@@ -14,7 +14,8 @@ ThisBuild / scalacOptions ++= Seq(
   "-language:postfixOps"
 )
 
-scapegoatIgnoredFiles := Seq(".*/Tables.scala", ".*/Routes.scala")
+scapegoatIgnoredFiles := Seq(".*/Tables.scala", ".*/Routes.scala", ".*/ReverseRoutes.scala", ".*/JavaScriptReverseRoutes.scala", ".*/.*mail.*template\\.scala")
+scapegoatDisabledInspections := Seq("FinalModifierOnCaseClass", "UnusedMethodParameter")
 
 lazy val commonSettings = Seq(
   resolvers ++= DependencyResolvers.dependencyResolvers,

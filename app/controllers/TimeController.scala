@@ -70,7 +70,7 @@ class TimeController @Inject()(userService: UserService,
 
     val input = new SimpleDateFormat("yy")
     val output = new SimpleDateFormat("yyyy")
-    var date = input.parse(year.toString)
+    val date = input.parse(year.toString)
     val fullYear = output.format(date).toInt
 
     //set them here to first day of selected month so getActualMaximum below will use the correct month entry

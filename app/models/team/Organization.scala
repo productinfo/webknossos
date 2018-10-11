@@ -88,8 +88,9 @@ class OrganizationDAO @Inject()(sqlClient: SQLClient)(implicit ec: ExecutionCont
 
   def findOrganizationTeamId(o: ObjectId) =
     for {
-      r <- run(sql"select _id from webknossos.organizationTeams where _organization = ${o.id}".as[String])
-      parsed <- ObjectId.parse(r.head)
+      rList <- run(sql"select _id from webknossos.organizationTeams where _organization = ${o.id}".as[String])
+      r <- rList.headOption.toFox
+      parsed <- ObjectId.parse(r)
     } yield parsed
 
 }

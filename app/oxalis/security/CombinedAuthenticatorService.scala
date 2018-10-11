@@ -31,6 +31,7 @@ class IdentityCookieSigner extends Signer {
   override def extract(message: String): Try[String] = Success(message)
 }
 
+@SuppressWarnings(Array("AsInstanceOf"))
 case class CombinedAuthenticatorService(cookieSettings: CookieAuthenticatorSettings,
                                         tokenSettings: BearerTokenAuthenticatorSettings,
                                         tokenDao: BearerTokenAuthenticatorRepository,

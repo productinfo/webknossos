@@ -60,22 +60,18 @@ class SimpleSQLDAO @Inject()(sqlClient: SQLClient)(implicit ec: ExecutionContext
   def run[R](query: DBIOAction[R, NoStream, Nothing],
              retryCount: Int = 0,
              retryIfErrorContains: List[String] = List()): Fox[R] = {
-    val foxFuture = sqlClient.db.run(query.asTry).map { result: Try[R] =>
-      result match {
-        case Success(res) => {
-          Fox.successful(res)
-        }
-        case Failure(e: Throwable) => {
-          val msg = e.getMessage
-          if (retryIfErrorContains.exists(msg.contains(_)) && retryCount > 0) {
-            logger.debug(s"Retrying SQL Query ($retryCount remaining) due to $msg")
-            Thread.sleep(20)
-            run(query, retryCount - 1, retryIfErrorContains)
-          } else {
-            logError(e, query)
-            reportErrorToNewrelic(e, query)
-            Fox.failure("SQL Failure: " + e.getMessage)
-          }
+    val foxFuture = sqlClient.db.run(query.asTry).map {
+      case Success(res) => Fox.successful(res)
+      case Failure(e: Throwable) => {
+        val msg = e.getMessage
+        if (retryIfErrorContains.exists(msg.contains(_)) && retryCount > 0) {
+          logger.debug(s"Retrying SQL Query ($retryCount remaining) due to $msg")
+          Thread.sleep(20)
+          run(query, retryCount - 1, retryIfErrorContains)
+        } else {
+          logError(e, query)
+          reportErrorToNewrelic(e, query)
+          Fox.failure("SQL Failure: " + e.getMessage)
         }
       }
     }

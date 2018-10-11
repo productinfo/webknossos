@@ -14,5 +14,5 @@ class SilhouetteModule extends AbstractModule {
 
   @Provides
   def providePasswordHasherRegistry(): PasswordHasherRegistry =
-    PasswordHasherRegistry(new PasswordHasher(), Seq())
+    PasswordHasherRegistry(new PasswordHasher(), Seq.empty)
 }

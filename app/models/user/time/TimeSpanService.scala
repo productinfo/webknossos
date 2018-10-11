@@ -10,7 +10,7 @@ import models.project.ProjectDAO
 import models.task.TaskDAO
 import models.user.{User, UserService}
 import models.team.OrganizationDAO
-import net.liftweb.common.Full
+import net.liftweb.common.{Empty, Full}
 import oxalis.mail.DefaultMails
 import oxalis.thirdparty.BrainTracing
 import utils.{ObjectId, WkConf}
@@ -100,10 +100,12 @@ class TimeSpanService @Inject()(annotationDAO: AnnotationDAO,
 
   private val lastUserActivities = mutable.HashMap.empty[ObjectId, TimeSpan]
 
+  @SuppressWarnings(Array("TraversableHead", "TraversableLast"))
   private def trackTime(timestamps: Seq[Long], _user: ObjectId, _annotation: Annotation)(
       implicit ctx: DBAccessContext) = {
     // Only if the annotation belongs to the user, we are going to log the time on the annotation
     val annotation = if (_annotation._user == _user) Some(_annotation) else None
+    // We are certain that timestamps contain at least 1 timestamp so it's okay to call head here. Although it would be nicer to prevent such a call
     val start = timestamps.head
 
     var timeSpansToInsert: List[TimeSpan] = List()
@@ -138,6 +140,7 @@ class TimeSpanService @Inject()(annotationDAO: AnnotationDAO,
       })
       .getOrElse(createNewTimeSpan(start, _user, annotation))
 
+    //same for this head and last call here
     timestamps.sliding(2).foreach { pair =>
       val start = pair.head
       val end = pair.last
@@ -217,7 +220,7 @@ class TimeSpanService @Inject()(annotationDAO: AnnotationDAO,
     } yield ()
 
     updateResult.onComplete { x =>
-      if (x.isFailure || x.get.isEmpty)
+      if (x.isFailure || x.getOrElse(Empty).isEmpty)
         logger.warn(s"Failed to save all time updates: $x")
     }
 

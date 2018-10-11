@@ -100,6 +100,7 @@ class TaskController @Inject()(annotationService: AnnotationService,
     })
   }
 
+  @SuppressWarnings(Array("OptionGet"))
   def createFromFiles = sil.SecuredAction.async { implicit request =>
     for {
       body <- request.body.asMultipartFormData ?~> "binary.payload.invalid"
@@ -148,7 +149,7 @@ class TaskController @Inject()(annotationService: AnnotationService,
 
   def createTasks(requestedTasks: List[(TaskParameters, SkeletonTracing)])(
       implicit request: SecuredRequest[WkEnv, _]): Fox[Result] = {
-    def assertAllOnSameDataset: Fox[String] = {
+    def assertAllOnSameDataset(firstTaskParameter: TaskParameters): Fox[String] = {
       def allOnSameDatasetIter(requestedTasksRest: List[(TaskParameters, SkeletonTracing)],
                                dataSetName: String): Boolean =
         requestedTasksRest match {
@@ -157,7 +158,7 @@ class TaskController @Inject()(annotationService: AnnotationService,
             head._1.dataSet == dataSetName && allOnSameDatasetIter(tail, dataSetName)
         }
 
-      val firstDataSetName = requestedTasks.head._1.dataSet
+      val firstDataSetName = firstTaskParameter.dataSet
       if (allOnSameDatasetIter(requestedTasks, firstDataSetName))
         Fox.successful(firstDataSetName)
       else
@@ -172,8 +173,9 @@ class TaskController @Inject()(annotationService: AnnotationService,
       } yield js
 
     for {
-      dataSetName <- assertAllOnSameDataset
-      dataSet <- dataSetDAO.findOneByNameAndOrganization(requestedTasks.head._1.dataSet, request.identity._organization) ?~> Messages(
+      firstTaskParameter <- requestedTasks.headOption.map(_._1).toFox
+      dataSetName <- assertAllOnSameDataset(firstTaskParameter)
+      dataSet <- dataSetDAO.findOneByNameAndOrganization(firstTaskParameter.dataSet, request.identity._organization) ?~> Messages(
         "dataSet.notFound",
         dataSetName)
       dataStoreHandler <- dataSetService.handlerFor(dataSet)

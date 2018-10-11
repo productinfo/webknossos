@@ -30,9 +30,9 @@ class TaskTypeInformationHandler @Inject()(taskTypeDAO: TaskTypeDAO,
         .toFox
       finishedAnnotations = annotations.filter(_.state == Finished)
       _ <- assertAllOnSameDataset(finishedAnnotations)
-      _ <- assertNonEmpty(finishedAnnotations) ?~> "taskType.noAnnotations"
+      firstAnnotation <- finishedAnnotations.headOption.toFox ?~> "taskType.noAnnotations"
       user <- userOpt ?~> "user.notAuthorised"
-      _dataSet = finishedAnnotations.head._dataSet
+      _dataSet = firstAnnotation._dataSet
       mergedAnnotation <- annotationMerger.mergeN(taskTypeId,
                                                   persistTracing = false,
                                                   user._id,

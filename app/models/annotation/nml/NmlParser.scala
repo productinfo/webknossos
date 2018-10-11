@@ -34,6 +34,7 @@ object NmlParser extends LazyLogging with ProtoGeometryImplicits {
 
   val DEFAULT_TIMESTAMP = 0L
 
+  @SuppressWarnings(Array("CatchException"))
   def parse(name: String,
             nmlInputStream: InputStream): Box[(Option[SkeletonTracing], Option[(VolumeTracing, String)], String)] =
     try {
@@ -66,22 +67,24 @@ object NmlParser extends LazyLogging with ProtoGeometryImplicits {
         logger.debug(s"Parsed NML file. Trees: ${trees.size}, Volumes: ${volumes.size}")
 
         val volumeTracingWithDataLocation =
-          if (volumes.isEmpty) None
-          else
-            Some(
-              (VolumeTracing(None,
-                             BoundingBox.empty,
-                             time,
-                             dataSetName,
-                             editPosition,
-                             editRotation,
-                             ElementClass.uint32,
-                             volumes.head.fallbackLayer,
-                             0,
-                             0,
-                             zoomLevel),
-               volumes.head.location)
-            )
+          volumes match {
+            case List() => None
+            case head :: _ =>
+              Some(
+                (VolumeTracing(None,
+                               BoundingBox.empty,
+                               time,
+                               dataSetName,
+                               editPosition,
+                               editRotation,
+                               ElementClass.uint32,
+                               head.fallbackLayer,
+                               0,
+                               0,
+                               zoomLevel),
+                 head.location)
+              )
+          }
 
         val skeletonTracing =
           if (trees.isEmpty) None

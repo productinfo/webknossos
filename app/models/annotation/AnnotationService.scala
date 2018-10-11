@@ -232,10 +232,10 @@ class AnnotationService @Inject()(annotationInformationProvider: AnnotationInfor
     val initialTree = Tree(
       1,
       Seq(initialNode),
-      Seq(),
+      Seq.empty,
       Some(Color(1, 0, 0, 1)),
       Seq(BranchPoint(initialNode.id, System.currentTimeMillis())),
-      Seq(),
+      Seq.empty,
       "",
       System.currentTimeMillis()
     )

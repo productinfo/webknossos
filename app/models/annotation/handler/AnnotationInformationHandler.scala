@@ -44,16 +44,12 @@ trait AnnotationInformationHandler extends FoxImplicits {
       }
     annotations match {
       case List() => Fox.successful(true)
-      case head :: tail => {
-        if (allOnSameDatasetIter(annotations, annotations.head._dataSet))
+      case head :: _ => {
+        if (allOnSameDatasetIter(annotations, head._dataSet))
           Fox.successful(true)
         else
           Fox.failure("Cannot create compound annotation spanning multiple datasets")
       }
     }
   }
-
-  def assertNonEmpty[T](seq: List[T]): Fox[Unit] =
-    if (seq.isEmpty) Fox.failure("no annotations")
-    else Fox.successful(())
 }

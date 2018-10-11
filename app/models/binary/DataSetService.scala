@@ -145,11 +145,9 @@ class DataSetService @Inject()(organizationDAO: OrganizationDAO,
       } yield tokenValue
 
     val tokenFoxOfFox: Fox[Fox[String]] =
-      dataSetDAO.getSharingTokenByName(dataSetName, organizationId).map { oldTokenOpt =>
-        oldTokenOpt match {
-          case Some(oldToken) => Fox.successful(oldToken)
-          case _              => createSharingToken(dataSetName)
-        }
+      dataSetDAO.getSharingTokenByName(dataSetName, organizationId).map {
+        case Some(oldToken) => Fox.successful(oldToken)
+        case _              => createSharingToken(dataSetName)
       }
 
     for {

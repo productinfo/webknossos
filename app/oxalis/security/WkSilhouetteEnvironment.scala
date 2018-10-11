@@ -65,7 +65,7 @@ class WkSilhouetteEnvironment @Inject()(
 
   override def authenticatorService: AuthenticatorService[CombinedAuthenticator] = combinedAuthenticatorService
 
-  override def requestProviders: Seq[RequestProvider] = Seq()
+  override def requestProviders: Seq[RequestProvider] = Seq.empty
 
   override def eventBus: EventBus = eventBusObject
 }

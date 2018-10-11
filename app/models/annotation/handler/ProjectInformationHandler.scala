@@ -24,10 +24,10 @@ class ProjectInformationHandler @Inject()(annotationDAO: AnnotationDAO,
       project <- projectDAO.findOne(projectId) ?~> "project.notFound"
       annotations <- annotationDAO.findAllFinishedForProject(project._id)
       _ <- assertAllOnSameDataset(annotations)
-      _ <- assertNonEmpty(annotations) ?~> "project.noAnnotations"
+      firstAnnotation <- annotations.headOption.toFox ?~> "project.noAnnotations"
       user <- userOpt ?~> "user.notAuthorised"
       _ <- Fox.assertTrue(userService.isTeamManagerOrAdminOf(user, project._team))
-      _dataSet = annotations.head._dataSet
+      _dataSet = firstAnnotation._dataSet
       mergedAnnotation <- annotationMerger.mergeN(projectId,
                                                   persistTracing = false,
                                                   user._id,
