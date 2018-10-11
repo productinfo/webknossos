@@ -48,7 +48,7 @@ class AnnotationController @Inject()(
       _ <- restrictions.allowAccess(request.identity) ?~> "notAllowed" ~> BAD_REQUEST
       js <- annotationService
         .publicWrites(annotation, request.identity, Some(restrictions)) ?~> "annotation.write.failed"
-      typedType <- AnnotationType.fromString(typ)
+      typedType <- AnnotationType.fromString(typ).toFox
       _ <- Fox.runOptional(request.identity) { user =>
         if (typedType == AnnotationType.Task || typedType == AnnotationType.Explorational) {
           timeSpanService.logUserInteraction(user, annotation) // log time when a user starts working
