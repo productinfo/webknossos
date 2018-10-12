@@ -33,15 +33,6 @@ class TeamController @Inject()(teamDAO: TeamDAO,
     }
   }
 
-  def listAllTeams = Action.async { implicit request =>
-    for {
-      allTeams <- teamDAO.findAll(GlobalAccessContext)
-      js <- Fox.serialCombined(allTeams)(t => teamService.publicWrites(t)(GlobalAccessContext))
-    } yield {
-      Ok(Json.toJson(js))
-    }
-  }
-
   def delete(id: String) = sil.SecuredAction.async { implicit request =>
     for {
       teamIdValidated <- ObjectId.parse(id)

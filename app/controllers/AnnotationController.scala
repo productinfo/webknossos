@@ -92,23 +92,6 @@ class AnnotationController @Inject()(
     }
   }
 
-  def revert(typ: String, id: String, version: Int) = sil.SecuredAction.async { implicit request =>
-    for {
-      annotation <- provider.provideAnnotation(typ, id, request.identity) ?~> "annotation.notFound"
-      restrictions <- provider.restrictionsFor(typ, id) ?~> "restrictions.notFound"
-      _ <- restrictions.allowUpdate(request.identity) ?~> Messages("notAllowed")
-      _ <- bool2Fox(annotation.isRevertPossible) ?~> Messages("annotation.revert.toOld")
-      dataSet <- dataSetDAO.findOne(annotation._dataSet)(GlobalAccessContext) ?~> "dataSet.notFound"
-      dataStoreHandler <- dataSetService.handlerFor(dataSet)
-      skeletonTracingId <- annotation.skeletonTracingId.toFox ?~> "annotation.noSkeleton"
-      newSkeletonTracingId <- dataStoreHandler.duplicateSkeletonTracing(skeletonTracingId, Some(version.toString))
-      _ <- annotationDAO.updateSkeletonTracingId(annotation._id, newSkeletonTracingId)
-    } yield {
-      logger.info(s"REVERTED [$typ - $id, $version]")
-      JsonOk("annotation.reverted")
-    }
-  }
-
   def reset(typ: String, id: String) = sil.SecuredAction.async { implicit request =>
     for {
       annotation <- provider.provideAnnotation(typ, id, request.identity) ?~> "annotation.notFound"
@@ -161,6 +144,18 @@ class AnnotationController @Inject()(
       }
     }
 
+  def makeHybrid(typ: String, id: String) = sil.SecuredAction.async { implicit request =>
+    for {
+      _ <- bool2Fox(AnnotationType.Explorational.toString == typ) ?~> "annotation.makeHybrid.explorationalsOnly"
+      annotation <- provider.provideAnnotation(typ, id, request.identity)
+      _ <- annotationService.makeAnnotationHybrid(request.identity, annotation) ?~> "annotation.makeHybrid.failed"
+      updated <- provider.provideAnnotation(typ, id, request.identity)
+      json <- annotationService.publicWrites(updated, Some(request.identity)) ?~> "annotation.write.failed"
+    } yield {
+      JsonOk(json)
+    }
+  }
+
   private def finishAnnotation(typ: String, id: String, issuingUser: User)(
       implicit ctx: DBAccessContext): Fox[(Annotation, String)] =
     for {
@@ -169,9 +164,7 @@ class AnnotationController @Inject()(
       message <- annotationService.finish(annotation, issuingUser, restrictions) ?~> "annotation.finish.failed"
       updated <- provider.provideAnnotation(typ, id, issuingUser)
       _ <- timeSpanService.logUserInteraction(issuingUser, annotation) // log time on tracing end
-    } yield {
-      (updated, message)
-    }
+    } yield (updated, message)
 
   def finish(typ: String, id: String) = sil.SecuredAction.async { implicit request =>
     for {
@@ -284,6 +277,6 @@ class AnnotationController @Inject()(
                                                        newVolumeTracingReference,
                                                        AnnotationType.Explorational,
                                                        None,
-                                                       annotation.description) ?~> Messages("annotation.create.failed")
+                                                       annotation.description) ?~> "annotation.create.failed"
     } yield clonedAnnotation
 }

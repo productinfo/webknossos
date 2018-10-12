@@ -41,7 +41,6 @@ class WKDataStoreController @Inject()(dataSetService: DataSetService,
         _ <- bool2Fox(dataSetService.isProperDataSetName(uploadInfo.name)) ?~> "dataSet.name.invalid"
         _ <- dataSetService
           .assertNewDataSetName(uploadInfo.name, organization._id)(GlobalAccessContext) ?~> "dataSet.name.alreadyTaken"
-        _ <- bool2Fox(uploadInfo.team.nonEmpty) ?~> "team.invalid"
       } yield Ok
     }
   }
