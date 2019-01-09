@@ -8,7 +8,7 @@ The root entity in webKnossos is an **organization**. You will create one when s
 
 When creating your organization, a default team with the same name will be created. This team is referred to as the **organization team**. Users that register for your organization will, by default, be assigned to that organization team. An organization can contain as many teams as you like. Users can be assigned to multiple teams. Teams are useful for managing dataset access permissions or simply to organize users into logical groups.
 
-![All users, annotations, and datasets belong to an organization. By default, all users are assigned to the organization team. Further teams can be created for fine-grained access permissions.](../.gitbook/assets/teams.png)
+![All users, annotations, and datasets belong to an organization. By default, all users are assigned to the organization team. Further teams can be created for fine-grained access permissions.](../.gitbook/assets/teams%20%281%29.png)
 
 ## Access Rights / Roles
 
@@ -41,7 +41,7 @@ When activating new users, a popup opens for
 * team assignment
 * access role assignment
 
-![Activate new users](../.gitbook/assets/users_activate1.png) ![Assign roles to new users](../.gitbook/assets/users_activate2.png)
+![Activate new users](../.gitbook/assets/users_activate1%20%281%29.png) ![Assign roles to new users](../.gitbook/assets/users_activate2%20%281%29.png)
 
 ## Password Reset / Change Email Address
 

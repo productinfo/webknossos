@@ -33,7 +33,7 @@ Try webKnossos yourself: [https://try.webknossos.org/](https://try.webknossos.or
 
 ## Screenshots
 
-![Skeleton Annotations](../.gitbook/assets/tracing_ui_skeleton.png) ![Volume Annotations](../.gitbook/assets/tracing_ui_volume.png) ![Flight Mode](../.gitbook/assets/tracing_ui_flight.png) ![Managing Datasets](../.gitbook/assets/dashboard_datasets.png) ![Working on Tasks](../.gitbook/assets/dashboard_tasks.png) ![Showcasing Datasets](../.gitbook/assets/spotlight%20%281%29.png)
+![Skeleton Annotations](../.gitbook/assets/tracing_ui_skeleton.png) ![Volume Annotations](../.gitbook/assets/tracing_ui_volume.png) ![Flight Mode](../.gitbook/assets/tracing_ui_flight%20%281%29.png) ![Managing Datasets](../.gitbook/assets/dashboard_datasets%20%281%29.png) ![Working on Tasks](../.gitbook/assets/dashboard_tasks%20%282%29.png) ![Showcasing Datasets](../.gitbook/assets/spotlight%20%282%29.png)
 
 ## Credits and Help
 

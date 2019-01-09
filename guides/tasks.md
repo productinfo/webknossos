@@ -16,15 +16,15 @@ It is possible to download all annotations that belong to either a Project or a 
 
 First, a Task Type needs to be created. Open the `Task Types` screen of the admin section and click on `Add Task Type`. Fill out the form in order to create the Task Type. Note that the `Description` field supports Markdown formatting. If you don't have a sophisticated team structure, just select the [Organization Team](users.md#organizations).
 
-![Create a Task Type](../.gitbook/assets/tasks_tasktype.png)
+![Create a Task Type](../.gitbook/assets/tasks_tasktype%20%281%29.png)
 
 Next, you need to set up a Project. Open the `Projects` screen of the admin section and click on `Add Project`. Fill out the form in order to create the Project. Note that you can assign a `Priority` to the Project. A higher value means that Tasks from this Project will be more likely to be assigned to users. With the `Time Limit` you can specify the expected completion time of a Task Instance. There will be an email notification if users exceed this limit.
 
-![Create a Project](../.gitbook/assets/tasks_project.png)
+![Create a Project](../.gitbook/assets/tasks_project%20%282%29.png)
 
 Now, you are ready to create Tasks. Open the `Tasks` screen of the admin section and click on `Add Task`. You can choose between a form for creating a single Task or an advanced interface for creating Tasks in bulk. For beginners, the form is recommended. Fill out the form in order to create the Task. Enter the starting positions in the lower part of the form. Alternatively, you can upload an NML file that contains nodes which will be used as starting positions.
 
-![Create a Task](../.gitbook/assets/tasks_task.png)
+![Create a Task](../.gitbook/assets/tasks_task%20%281%29.png)
 
 {% hint style="info" %}
 Note that you need to specify required Experiences for a Task. Your Task can only be assigned if there are users that have the required Experience.
@@ -36,11 +36,11 @@ You can assign an Experience to a user on the `Users` screen.
 
 After your Task has been created, users can request Tasks in their dashboard. If there are no other Tasks, they will get your Task assigned. When they are done, the users will `Finish` their Task Instance.
 
-![Requesting Tasks in the Dashboard](../.gitbook/assets/dashboard_tasks.png)
+![Requesting Tasks in the Dashboard](../.gitbook/assets/dashboard_tasks%20%282%29.png)
 
 Finally, collect the completed data from the `Projects` screen by downloading a ZIP file with all NML files.
 
-![Download all Tasks of a Project](../.gitbook/assets/tasks_download.png)
+![Download all Tasks of a Project](../.gitbook/assets/tasks_download%20%281%29.png)
 
 ## Task Assignment Criteria
 

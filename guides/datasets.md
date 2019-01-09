@@ -46,7 +46,7 @@ You can edit the properties of a dataset at any time. In addition to the require
 
 The `Advanced` view lets you edit the underlying JSON configuration directly.
 
-![Dataset Editing: Data Tab](../.gitbook/assets/dataset_data%20%281%29.png)
+![Dataset Editing: Data Tab](../.gitbook/assets/dataset_data%20%282%29.png)
 
 ### General
 
@@ -56,7 +56,7 @@ The `Advanced` view lets you edit the underlying JSON configuration directly.
 * `Visibility`: Lets you make the dataset available to the general public and shows it in the public [Gallery view](sharing.md#public-sharing). This will enable any visitor to your webKnossos instance to view the data, even unregistered users.
 * `Sharing Link`: A special URL which allows any user to view your dataset that uses this link. Because of the included random token, the link cannot be guessed by random visitors. You may also revoke the random token and create a new one when you don't want previous users to access your data anymore. Read more in [the Sharing guide](sharing.md).
 
-![Dataset Editing: General Tab](../.gitbook/assets/dataset_general%20%281%29.png)
+![Dataset Editing: General Tab](../.gitbook/assets/dataset_general%20%283%29.png)
 
 ### View Configuration
 
@@ -66,7 +66,7 @@ The `Advanced` view lets you edit the underlying JSON configuration directly.
 * `Interpolation`: Whether interpolation should be enabled by default.
 * `Layer Configuration`: This is an advanced feature to control the default settings \(e.g. brightness, contrast, color\) per layer. It needs to be configured in a JSON format.
 
-![Dataset Editing: View Configuration Tab](../.gitbook/assets/dataset_view_config.png)
+![Dataset Editing: View Configuration Tab](../.gitbook/assets/dataset_view_config%20%281%29.png)
 
 ## Dataset Sharing
 

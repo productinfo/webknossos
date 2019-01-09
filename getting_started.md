@@ -32,7 +32,7 @@ You may also install webKnossos without Docker. This may be useful if you intend
 
 When starting with webKnossos you first need to create an organization. An organization represents your lab in webKnossos and handles permissions for users and datasets. Choose a descriptive name for your organization, e.g. "The University of Springfield", "Simpsons Lab" or "Neuroscience Department".
 
-![Create your organization](.gitbook/assets/onboarding_organization%20%281%29.png)
+![Create your organization](.gitbook/assets/onboarding_organization%20%283%29.png)
 
 In the onboarding flow, you are asked to create a user account for yourself. This will be the first user of your organization which will automatically be activated and granted admin rights. Make sure to enter a correct email address.
 
@@ -48,7 +48,7 @@ If you do not have a compatible dataset available, you can use [this small datas
 
 By default, datasets are visible to all users in your organization. However, webKnossos includes fine-grained permissions to assign datasets to groups of users.
 
-![Upload your first dataset](.gitbook/assets/onboarding_data1.png) ![Confirm the dataset properties](.gitbook/assets/onboarding_data2%20%281%29.png)
+![Upload your first dataset](.gitbook/assets/onboarding_data1.png) ![Confirm the dataset properties](.gitbook/assets/onboarding_data2%20%283%29.png)
 
 ## Your First Annotation
 
@@ -58,7 +58,7 @@ Drag the mouse while pressing the left mouse button to navigate the dataset. Rig
 
 Learn more about the skeleton, volume, and hybrid annotations as well as the interface in the [Tracing UI guide](guides/tracing_ui.md).
 
-{% embed data="{\"url\":\"https://www.youtube.com/embed/rMMaItS\_HYE\",\"type\":\"video\",\"title\":\"webKnossos Tracing UI Skeleton\",\"icon\":{\"type\":\"icon\",\"url\":\"https://www.youtube.com/yts/img/favicon\_144-vfliLAfaB.png\",\"width\":144,\"height\":144,\"aspectRatio\":1},\"thumbnail\":{\"type\":\"thumbnail\",\"url\":\"https://i.ytimg.com/vi/rMMaItS\_HYE/mqdefault.jpg\",\"width\":320,\"height\":180,\"aspectRatio\":0.5625},\"embed\":{\"type\":\"player\",\"url\":\"https://www.youtube.com/embed/rMMaItS\_HYE?rel=0&showinfo=0\",\"html\":\"<div style=\\\"left: 0; width: 100%; height: 0; position: relative; padding-bottom: 56.2493%;\\\"><iframe src=\\\"https://www.youtube.com/embed/rMMaItS\_HYE?rel=0&amp;showinfo=0\\\" style=\\\"border: 0; top: 0; left: 0; width: 100%; height: 100%; position: absolute;\\\" allowfullscreen scrolling=\\\"no\\\"></iframe></div>\",\"aspectRatio\":1.7778}}" %}
+{% embed url="https://www.youtube.com/embed/rMMaItS\_HYE" %}
 
 ## Learn more
 

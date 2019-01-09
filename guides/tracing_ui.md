@@ -25,7 +25,7 @@ The most common buttons are:
 
 A user can directly jump to positions within their datasets by entering them in the position input field. The same is true for the rotation in some tracing modes. Clicking on the position or rotation labels copies the values to the clipboard.
 
-![The webKnossos toolbar contains many useful features for quick access such as Saving und Undo/Redo](../.gitbook/assets/tracing_ui_toolbar%20%281%29.png)
+![The webKnossos toolbar contains many useful features for quick access such as Saving und Undo/Redo](../.gitbook/assets/tracing_ui_toolbar%20%283%29.png)
 
 ## Skeleton Annotations
 
@@ -37,7 +37,7 @@ Skeleton annotations can be downloaded, modified, imported using a human-readabl
 
 This article outlines commonly used features and operations for viewing, editing, or creating new skeleton annotations in webKnossos.
 
-![An example of a complex webKnossos skeleton annotation](../.gitbook/assets/tracing_ui_skeletontracing%20%281%29.jpg)
+![An example of a complex webKnossos skeleton annotation](../.gitbook/assets/tracing_ui_skeletontracing%20%283%29.jpg)
 
 ### Tracing Modes
 
@@ -49,7 +49,7 @@ Orthogonal mode displays a dataset with the camera oriented orthogonally to each
 
 Most skeleton tracing operations and keyboard shortcuts are tailored for the Orthogonal Mode.
 
-![Switch between different tracing modes using the buttons in the toolbar](../.gitbook/assets/tracing_ui_modes%20%281%29.png)
+![Switch between different tracing modes using the buttons in the toolbar](../.gitbook/assets/tracing_ui_modes%20%282%29.png)
 
 #### Oblique Mode
 
@@ -59,13 +59,13 @@ Oblique mode presents an arbitrarily-resliced view through the data. In contrast
 
 Flight mode also allows a resliced view through the data. In contrast to Oblique mode, the data is projected on the inside of a sphere with the camera located at the center of the sphere.
 
-![Tracing neurons efficiently in Flight mode](../.gitbook/assets/tracing_ui_flightmode.jpg)
+![Tracing neurons efficiently in Flight mode](../.gitbook/assets/tracing_ui_flightmode%20%281%29.jpg)
 
 Spherical projection is especially useful when rotating the camera, as pixels close to the center of the screen move in a predictable manner. Interactions and movements in Flight mode feel similar to First-Person-View \(FPV\) games.
 
-![Spherical projection of the Flight mode](../.gitbook/assets/tracing_ui_flightmode_schema.png) ![Seamless rotation and navigation in the Flight mode](../.gitbook/assets/tracing_ui_flightmode_rotate.gif)
+![Spherical projection of the Flight mode](../.gitbook/assets/tracing_ui_flightmode_schema%20%282%29.png) ![Seamless rotation and navigation in the Flight mode](../.gitbook/assets/tracing_ui_flightmode_rotate.gif)
 
-![Changing the radius of the spherical projection](../.gitbook/assets/tracing_ui_flightmode_radius.gif)
+![Changing the radius of the spherical projection](../.gitbook/assets/tracing_ui_flightmode_radius%20%281%29.gif)
 
 Flight mode is best used for annotating structures very quickly. Trained tracers can follow "tube"-like structures as though they are "flying" through them. Nodes are placed automatically along the flight path, creating skeleton very efficiently.
 
@@ -97,7 +97,7 @@ All operations and information regarding trees are organized under a tab called 
 
 A typical skeleton annotation consists of one or more trees. Trees can be nested and organized in so-called `Tree Groups`. Tree groups can have a name and are used to structure and label your annotation even further. Trees can be dragged and dropped between tree groups. However over existing tree groups the bring up a little menu for creating new groups, renaming, and deletion.
 
-![Organize your skeleton annotation&apos;s trees to remember important structures for later reference](../.gitbook/assets/tracing_ui_trees%20%281%29.jpg)
+![Organize your skeleton annotation&apos;s trees to remember important structures for later reference](../.gitbook/assets/tracing_ui_trees%20%283%29.jpg)
 
 #### Merging / Splitting Trees
 
@@ -114,7 +114,7 @@ Common tree operations include splitting and merging trees.
 
 A random color is assigned to each tree upon creation. Colors can be shuffled for a single tree or for all trees in a skeleton. Use the overflow menu under `More` in the tree tab and select `Change Color` or `Shuffle All Colors` to assign new randomly chosen colors. All node have the same color as their parent tree and can not be changed individually. The active node, branch points, and node that have comments assigned to them are highlighted with a slight variation of the tree's color.
 
-![Trees are randomly assigned colors upon creation. Users can assign new random colors to a single tree or all trees at once.](../.gitbook/assets/tracing_ui_tree_color%20%281%29.png)
+![Trees are randomly assigned colors upon creation. Users can assign new random colors to a single tree or all trees at once.](../.gitbook/assets/tracing_ui_tree_color%20%282%29.png)
 
 #### Tree Visibility
 
@@ -127,7 +127,7 @@ The visibility of individual trees can be toggled to hide some trees for a bette
 | SHIFT + ALT + Left Click | Merge Two Nodes and Combine Trees |
 | SHIFT + CTRL + Left Click | Delete Edge / Split Trees |
 
-![Trees can be hidden for a better overview over the data. Toggle the visibility of individual tree using the checkbox in front of the tree&apos;s name or use the button to toggle all \(inactive\) trees at once.](../.gitbook/assets/tracing_ui_tree_visibility.png)
+![Trees can be hidden for a better overview over the data. Toggle the visibility of individual tree using the checkbox in front of the tree&apos;s name or use the button to toggle all \(inactive\) trees at once.](../.gitbook/assets/tracing_ui_tree_visibility%20%281%29.png)
 
 ### Importing & Exporting NML Files
 
@@ -136,7 +136,7 @@ webKnossos makes it easy to import or export skeleton annotations as [NML files]
 1. There is a `Download` button in the overflow menu next to the prominent `Save` button in the toolbar at the top of the screen.
 2. If you need more fine-grained control over which trees to download use the `Download Selected Trees` option. From the `Trees Tab` click on `More` and select `Download Selected Trees` from the menu. All visible trees \(checkmark in front of the name\) will be downloaded as an NML file. This is especially useful if you need to only download a single tree of an otherwise much larger tracing.
 
-![Skeletons can be exported and downloaded as NML files from the tracing view. Either download all or only selected trees.](../.gitbook/assets/tracing_ui_download.png)
+![Skeletons can be exported and downloaded as NML files from the tracing view. Either download all or only selected trees.](../.gitbook/assets/tracing_ui_download%20%281%29.png)
 
 Importing a skeleton annotation can be achieved using two approaches as well:
 
@@ -152,7 +152,7 @@ There are two ways for merging annotations:
 1. While in the tracing UI, **drag and drop** an NML file onto your browser window to import a skeleton. The imported skeleton will be merged with currently open annotation.
 2. If you would like to merge your current annotation with another existing annotation, select the `Merge` operation from the overflow menu next to the `Save` button. \(see image\) Either enter the ID of an existing explorative annotation or select a whole project and proceed to merge the selection with your currently open annotation. The resulting annotation can either be created as a new explorative annotation. Otherwise, the merge will happen in your current annotation.
 
-![1. Select the Merge operation from the menu](../.gitbook/assets/tracing_ui_merge_1%20%281%29.png) ![2. Merging can be done with a whole webKnossos project or using the ID of an existing explorative annotation](../.gitbook/assets/tracing_ui_merge_2.png)
+![1. Select the Merge operation from the menu](../.gitbook/assets/tracing_ui_merge_1%20%283%29.png) ![2. Merging can be done with a whole webKnossos project or using the ID of an existing explorative annotation](../.gitbook/assets/tracing_ui_merge_2.png)
 
 ## Volume Annotations
 
@@ -170,7 +170,7 @@ Add labels with _Left Mouse Drag_. Remove labels with _Right Mouse Drag_.
 
 In the `Segmentation` tab on the right-hand side, you can see the cell IDs which are active, below your cursor, or in the middle of the viewport.
 
-![Adding labels with the Trace tool](../.gitbook/assets/volume_trace.gif) ![Adding labels with the Brush tool](../.gitbook/assets/volume_brush.gif) ![Removing labels with the Brush tool](../.gitbook/assets/volume_delete.gif)
+![Adding labels with the Trace tool](../.gitbook/assets/volume_trace%20%281%29.gif) ![Adding labels with the Brush tool](../.gitbook/assets/volume_brush%20%281%29.gif) ![Removing labels with the Brush tool](../.gitbook/assets/volume_delete%20%282%29.gif)
 
 ## Tracing UI Settings
 

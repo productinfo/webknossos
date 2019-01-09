@@ -8,7 +8,7 @@ This screen shows all the available and accessible datasets for a user. The pres
 
 You can view the dataset, or create a new skeleton or volume annotations from this screen. Search for your dataset by using the search bar or by sorting any of the table columns. Learn more about managing datasets in the [Datasets guide](datasets.md).
 
-![Dashboard for Team Managers or Admins](../.gitbook/assets/dashboard_datasets.png) ![Dashboard for Normal Users](../.gitbook/assets/dashboard_normal_user.png)
+![Dashboard for Team Managers or Admins](../.gitbook/assets/dashboard_datasets%20%281%29.png) ![Dashboard for Normal Users](../.gitbook/assets/dashboard_normal_user.png)
 
 ## Tasks
 
@@ -16,7 +16,7 @@ With Tasks, you can coordinate large annotation projects with your users. Tasks 
 
 On the Task screen, users can request new tasks, continue to work on existing tasks and finish tasks. These tasks will be assigned based on the user's experience levels, project priority, and task availability. Read more about the tasks feature in the [Tasks and Projects guide](tasks.md).
 
-![Work with Tasks](../.gitbook/assets/dashboard_tasks.png)
+![Work with Tasks](../.gitbook/assets/dashboard_tasks%20%282%29.png)
 
 ## Explorative Annotations
 
@@ -24,7 +24,7 @@ Explorative Annotations are all skeleton or volume annotations that do not belon
 
 In this screen, the annotations can be resumed, archived and downloaded. You can also add custom tags to annotations in order to organize them.
 
-![Manage and resume Explorative Annotations](../.gitbook/assets/dashboard_annotations.png) ![View archived Explorative Annotations](../.gitbook/assets/dashboard_archive.png)
+![Manage and resume Explorative Annotations](../.gitbook/assets/dashboard_annotations.png) ![View archived Explorative Annotations](../.gitbook/assets/dashboard_archive%20%282%29.png)
 
 ## Dataset Gallery
 

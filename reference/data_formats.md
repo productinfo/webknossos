@@ -28,7 +28,7 @@ A dataset consists of one or more layers. For electron-microscopy \(EM\) data, t
 
 For light-microscopy \(LM\) data, there may be multiple layers with different channels.
 
-![Color and Segmentation Layers](../.gitbook/assets/datalayers%20%281%29.png)
+![Color and Segmentation Layers](../.gitbook/assets/datalayers%20%282%29.png)
 
 #### Magnification Steps and Downsampling
 

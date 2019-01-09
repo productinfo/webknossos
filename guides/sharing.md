@@ -30,7 +30,7 @@ To share a dataset privately, follow these steps:
 
 That's all you need to do.
 
-![Configure the Dataset Sharing](../.gitbook/assets/dataset_general%20%281%29.png)
+![Configure the Dataset Sharing](../.gitbook/assets/dataset_general%20%283%29.png)
 
 To revoke a sharing link in the future, click the `Revoke` button to the right-hand side of the link.
 
@@ -42,7 +42,7 @@ Do not enable the `Make dataset publicly accessible` checkbox or otherwise, your
 
 Public sharing provides access to your dataset to the general public. Anyone can access the shared dataset and view it on your webKnossos instance without the need for an account. Further, publicly shared datasets are featured in a dataset gallery on your webKnossos start page for logged-out users. Alternatively, navigate to `https://<webKnossos-url>/spotlight`.
 
-![The Dataset Gallery view provides a public showcase of all your published datasets. No wK account is required to view these.](../.gitbook/assets/spotlight%20%281%29.png)
+![The Dataset Gallery view provides a public showcase of all your published datasets. No wK account is required to view these.](../.gitbook/assets/spotlight%20%282%29.png)
 
 Public datasets provide an easy and convenient way of sharing your data with outside users after you have successfully published them. Outside users can navigate through your data from the comfort of their own browser.
 
@@ -77,7 +77,7 @@ To share an annotation, follow these steps:
 3. Copy the sharing URL for private access.
 4. Enable public sharing with the checkbox, if required.
 
-![Configure the Annotation Sharing](../.gitbook/assets/tracing_ui_sharing%20%281%29.png)
+![Configure the Annotation Sharing](../.gitbook/assets/tracing_ui_sharing%20%283%29.png)
 
 For public annotations to work properly, the underlying dataset must also be shared publicly or privately \(via token URL\). Otherwise, the annotation and data cannot be loaded by webKnossos and an error will occur. [Learn how to share datasets publicly above.](sharing.md#public-sharing)
 
