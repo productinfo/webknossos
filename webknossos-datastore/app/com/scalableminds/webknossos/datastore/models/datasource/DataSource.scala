@@ -12,7 +12,11 @@ package object datasource {
     implicit val dataSourceIdFormat: Format[DataSourceId] = Json.format[DataSourceId]
   }
 
-  case class GenericDataSource[+T <: DataLayerLike](id: DataSourceId, dataLayers: List[T], scale: Scale) extends GenericInboxDataSource[T] {
+  case class GenericDataSource[+T <: DataLayerLike](id: DataSourceId,
+                                                    dataLayers: List[T],
+                                                    scale: Scale,
+                                                    fileSize: Option[Long] = None)
+      extends GenericInboxDataSource[T] {
 
     val toUsable: Option[GenericDataSource[T]] = Some(this)
 
@@ -31,24 +35,26 @@ package object datasource {
 
   object GenericDataSource {
 
-    implicit def dataSourceFormat[T <: DataLayerLike](implicit fmt: Format[T]): Format[GenericDataSource[T]] = new Format[GenericDataSource[T]] {
+    implicit def dataSourceFormat[T <: DataLayerLike](implicit fmt: Format[T]): Format[GenericDataSource[T]] =
+      new Format[GenericDataSource[T]] {
 
-      def reads(json: JsValue): JsResult[GenericDataSource[T]] = {
-        for {
-          id <- (json \ "id").validate[DataSourceId]
-          dataLayers <- (json \ "dataLayers").validate[List[T]]
-          scale <- (json \ "scale").validate[Scale]
-        } yield {
-          GenericDataSource(id, dataLayers, scale)
-        }
+        def reads(json: JsValue): JsResult[GenericDataSource[T]] =
+          for {
+            id <- (json \ "id").validate[DataSourceId]
+            dataLayers <- (json \ "dataLayers").validate[List[T]]
+            scale <- (json \ "scale").validate[Scale]
+            fileSize <- (json \ "fileSize").validateOpt[Long]
+          } yield {
+            GenericDataSource(id, dataLayers, scale, fileSize)
+          }
+
+        def writes(ds: GenericDataSource[T]) = Json.obj(
+          "id" -> DataSourceId.dataSourceIdFormat.writes(ds.id),
+          "dataLayers" -> ds.dataLayers.map(Json.toJson(_)),
+          "scale" -> Scale.scaleWrites.writes(ds.scale),
+          "fileSize" -> ds.fileSize
+        )
       }
-
-      def writes(ds: GenericDataSource[T]) = Json.obj(
-        "id" -> DataSourceId.dataSourceIdFormat.writes(ds.id),
-        "dataLayers" -> ds.dataLayers.map(Json.toJson(_)),
-        "scale" -> Scale.scaleWrites.writes(ds.scale)
-      )
-    }
   }
 
   type DataSource = GenericDataSource[DataLayer]
